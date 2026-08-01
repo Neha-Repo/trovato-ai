@@ -1,0 +1,23 @@
+:root {
+  --trovato-color-primary: #4f7cff;
+  --trovato-color-primary-dark: #3458d4;
+  --trovato-color-secondary: #7c5cff;
+
+  --trovato-color-background: #07101f;
+  --trovato-color-surface: #0f1b32;
+  --trovato-color-surface-elevated: #162541;
+
+  --trovato-color-text-primary: #f8fafc;
+  --trovato-color-text-secondary: #a8b3c7;
+  --trovato-color-border: rgba(255, 255, 255, 0.1);
+
+  --trovato-color-success: #45c98f;
+  --trovato-color-warning: #f5b942;
+  --trovato-color-error: #ef6a78;
+
+  --trovato-gradient-primary: linear-gradient(
+    135deg,
+    var(--trovato-color-primary),
+    var(--trovato-color-secondary)
+  );
+}

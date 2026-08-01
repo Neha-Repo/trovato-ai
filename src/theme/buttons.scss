@@ -1,0 +1,30 @@
+.trovato-button {
+  --border-radius: var(--trovato-radius-md);
+  --box-shadow: none;
+  --padding-top: 1rem;
+  --padding-bottom: 1rem;
+
+  min-height: 3.25rem;
+  margin: 0;
+  font-family: var(--trovato-font-family);
+  font-size: var(--trovato-font-size-body);
+  font-weight: var(--trovato-font-weight-semibold);
+  text-transform: none;
+}
+
+.trovato-button--primary {
+  --background: var(--trovato-gradient-primary);
+  --background-hover: var(--trovato-gradient-primary);
+  --background-activated: var(--trovato-gradient-primary);
+  --color: var(--trovato-color-text-primary);
+}
+
+.trovato-button--secondary {
+  --background: transparent;
+  --background-hover: rgba(255, 255, 255, 0.04);
+  --background-activated: rgba(255, 255, 255, 0.08);
+  --border-color: var(--trovato-color-border);
+  --border-style: solid;
+  --border-width: 1px;
+  --color: var(--trovato-color-text-primary);
+}
