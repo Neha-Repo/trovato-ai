@@ -1,0 +1,7 @@
+{
+  "name": "trovato-ai",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
