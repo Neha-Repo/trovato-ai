@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { IonContent } from '@ionic/angular/standalone';
 
 import { ChatMessage } from '../../models/chat-message.model';
+import { ChatService } from '../../services/chat.service';
 
 @Component({
   selector: 'app-chat',
@@ -15,37 +16,35 @@ export class ChatPage {
   userInput = '';
   messages: ChatMessage[] = [];
 
+  constructor(private readonly chatService: ChatService) {}
+
   get hasConversation(): boolean {
     return this.messages.length > 0;
   }
 
-  sendMessage(): void {
-  const text = this.userInput.trim();
-
-  if (!text) {
-    return;
+  selectSuggestion(text: string): void {
+    this.userInput = text;
   }
 
-  this.messages.push({
-    id: crypto.randomUUID(),
-    sender: 'user',
-    text,
-    createdAt: new Date(),
-  });
+  sendMessage(): void {
+    const text = this.userInput.trim();
 
-  this.userInput = '';
+    if (!text) {
+      return;
+    }
 
-  window.setTimeout(() => {
-    this.messages.push({
-      id: crypto.randomUUID(),
-      sender: 'assistant',
-      text:
-        'Great choice. I’ll help you find available tickets, suitable times, and alternatives if your preferred option is sold out.',
-      createdAt: new Date(),
-    });
-  }, 900);
-}
-selectSuggestion(text: string): void {
-  this.userInput = text;
-}
+    this.messages.push(
+      this.chatService.createUserMessage(text)
+    );
+
+    this.userInput = '';
+
+    window.setTimeout(() => {
+      this.messages.push(
+        this.chatService.createAssistantMessage(
+  this.chatService.getAssistantResponse(text)
+)
+      );
+    }, 900);
+  }
 }
