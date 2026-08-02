@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { IonContent } from '@ionic/angular/standalone';
@@ -22,6 +23,7 @@ export class ChatPage {
   constructor(
     private readonly chatService: ChatService,
     private readonly chatApiService: ChatApiService,
+    private readonly router: Router,
   ) {}
 
   get hasConversation(): boolean {
@@ -39,18 +41,26 @@ export class ChatPage {
       return;
     }
 
-    this.messages.push(this.chatService.createUserMessage(text));
+    const userMessage = this.chatService.createUserMessage(text);
+
+    this.messages.push(userMessage);
     this.userInput = '';
     this.isSending = true;
 
     try {
       const response = await firstValueFrom(
-        this.chatApiService.sendMessage(text),
+        this.chatApiService.sendMessages(this.messages),
       );
 
       this.messages.push(
         this.chatService.createAssistantMessage(response.reply),
       );
+
+      if (response.searchReady) {
+        window.setTimeout(() => {
+          void this.router.navigate(['/results']);
+        }, 900);
+      }
     } catch (error: unknown) {
       console.error('Chat request failed', error);
 

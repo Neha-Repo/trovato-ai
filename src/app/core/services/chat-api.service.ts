@@ -2,12 +2,15 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+import { ChatMessage } from '../../features/chat/models/chat-message.model';
+
 interface ChatRequest {
-  message: string;
+  messages: ChatMessage[];
 }
 
-interface ChatResponse {
+export interface ChatResponse {
   reply: string;
+  searchReady: boolean;
 }
 
 @Injectable({
@@ -17,8 +20,8 @@ export class ChatApiService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = 'http://localhost:3000/chat';
 
-  sendMessage(message: string): Observable<ChatResponse> {
-    const request: ChatRequest = { message };
+  sendMessages(messages: ChatMessage[]): Observable<ChatResponse> {
+    const request: ChatRequest = { messages };
 
     return this.http.post<ChatResponse>(this.apiUrl, request);
   }

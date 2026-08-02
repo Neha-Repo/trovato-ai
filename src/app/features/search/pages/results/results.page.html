@@ -1,0 +1,117 @@
+<ion-content [fullscreen]="true" class="results-page">
+  <main class="results-container">
+    <section class="hero">
+      <img
+        [src]="result.imageUrl"
+        [alt]="result.title"
+        class="hero-image"
+      />
+
+      <div class="hero-overlay"></div>
+
+      <div class="hero-content">
+        <p class="hero-location">{{ result.location }}</p>
+        <h1>{{ result.title }}</h1>
+      </div>
+    </section>
+
+    <section class="availability-summary">
+      <div>
+        <p class="summary-label">Availability</p>
+        <h2>
+          @if (selectedSlots.length > 0) {
+            Tickets available
+          } @else {
+            No suitable slots
+          }
+        </h2>
+      </div>
+
+      <div class="traveller-count">
+        {{ result.requestedTicketCount }}
+        {{ result.requestedTicketCount === 1 ? 'traveller' : 'travellers' }}
+      </div>
+    </section>
+
+    <section class="date-section">
+      <div class="section-heading">
+        <p class="section-kicker">Choose a date</p>
+        <h2>{{ selectedDate }}</h2>
+      </div>
+
+      <div class="date-chips" role="list">
+        <button
+          type="button"
+          class="date-chip"
+          [class.date-chip--active]="selectedDate === result.requestedDate"
+          (click)="selectRequestedDate()"
+        >
+          {{ result.requestedDate }}
+        </button>
+
+        @for (date of result.alternateDates; track date.date) {
+          <button
+            type="button"
+            class="date-chip"
+            [class.date-chip--active]="selectedDate === date.date"
+            (click)="selectAlternateDate(date)"
+          >
+            {{ date.date }}
+          </button>
+        }
+      </div>
+    </section>
+
+    <section class="slots-section">
+      <div class="section-heading">
+        <p class="section-kicker">Available times</p>
+        <h2>
+          {{ selectedSlots.length }}
+          {{ selectedSlots.length === 1 ? 'slot' : 'slots' }}
+        </h2>
+      </div>
+
+      @if (selectedSlots.length > 0) {
+        <div class="slot-list">
+          @for (slot of selectedSlots; track slot.id) {
+            <article class="slot-card">
+              <div class="slot-details">
+                <h3>{{ slot.time }}</h3>
+
+                <p>
+                  {{ slot.availableTickets }}
+                  tickets available
+                </p>
+
+                <p class="slot-price">
+                  €{{ slot.pricePerPerson }} per person
+                </p>
+              </div>
+
+              <button
+                type="button"
+                class="continue-button"
+                (click)="continueBooking(slot)"
+              >
+                Continue Booking
+              </button>
+            </article>
+          }
+        </div>
+      } @else {
+        <section class="unavailable-card">
+          <h3>No slot fits your group on this date</h3>
+
+          <p>
+            Choose another available date or ask to be notified when a suitable
+            slot becomes available.
+          </p>
+
+          <button type="button" class="notify-button">
+            Notify me
+          </button>
+        </section>
+      }
+    </section>
+  </main>
+</ion-content>

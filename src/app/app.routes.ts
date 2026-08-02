@@ -15,6 +15,13 @@ export const routes: Routes = [
       (m) => m.ChatPage
     ),
 },
+{
+  path: 'results',
+  loadComponent: () =>
+    import('./features/search/pages/results/results.page').then(
+      (m) => m.ResultsPage
+    ),
+},
   {
     path: '',
     redirectTo: 'home',
@@ -27,5 +34,9 @@ export const routes: Routes = [
   {
     path: 'chat',
     loadComponent: () => import('./features/chat/pages/chat/chat.page').then( m => m.ChatPage)
+  },
+  {
+    path: 'results',
+    loadComponent: () => import('./features/search/pages/results/results.page').then( m => m.ResultsPage)
   },
 ];
