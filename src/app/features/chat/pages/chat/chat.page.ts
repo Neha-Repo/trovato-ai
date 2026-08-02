@@ -1,7 +1,9 @@
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { IonContent } from '@ionic/angular/standalone';
 
+import { ChatApiService } from '../../../../core/services/chat-api.service';
 import { ChatMessage } from '../../models/chat-message.model';
 import { ChatService } from '../../services/chat.service';
 
@@ -15,8 +17,12 @@ import { ChatService } from '../../services/chat.service';
 export class ChatPage {
   userInput = '';
   messages: ChatMessage[] = [];
+  isSending = false;
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly chatApiService: ChatApiService,
+  ) {}
 
   get hasConversation(): boolean {
     return this.messages.length > 0;
@@ -26,25 +32,35 @@ export class ChatPage {
     this.userInput = text;
   }
 
-  sendMessage(): void {
+  async sendMessage(): Promise<void> {
     const text = this.userInput.trim();
 
-    if (!text) {
+    if (!text || this.isSending) {
       return;
     }
 
-    this.messages.push(
-      this.chatService.createUserMessage(text)
-    );
-
+    this.messages.push(this.chatService.createUserMessage(text));
     this.userInput = '';
+    this.isSending = true;
 
-    window.setTimeout(() => {
+    try {
+      const response = await firstValueFrom(
+        this.chatApiService.sendMessage(text),
+      );
+
+      this.messages.push(
+        this.chatService.createAssistantMessage(response.reply),
+      );
+    } catch (error: unknown) {
+      console.error('Chat request failed', error);
+
       this.messages.push(
         this.chatService.createAssistantMessage(
-  this.chatService.getAssistantResponse(text)
-)
+          'I could not reach the Trovato AI service. Please try again.',
+        ),
       );
-    }, 900);
+    } finally {
+      this.isSending = false;
+    }
   }
 }
