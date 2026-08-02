@@ -34,6 +34,8 @@
   gap: var(--trovato-space-xl);
 }
 
+/* ---------------- Header ---------------- */
+
 .chat-header {
   text-align: center;
 }
@@ -59,6 +61,7 @@
 h1 {
   max-width: 380px;
   margin: 0 auto;
+
   color: var(--trovato-color-text-primary);
   font-size: clamp(2rem, 7vw, 2.5rem);
   font-weight: var(--trovato-font-weight-bold);
@@ -69,65 +72,140 @@ h1 {
 .chat-intro {
   max-width: 360px;
   margin: var(--trovato-space-md) auto 0;
+
   color: var(--trovato-color-text-secondary);
   font-size: var(--trovato-font-size-body);
   line-height: var(--trovato-line-height-relaxed);
 }
 
+/* ---------------- Suggestion cards ---------------- */
+
 .suggestions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--trovato-space-sm);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--trovato-space-md);
 }
 
 .suggestions button {
-  min-height: 72px;
-  padding: var(--trovato-space-md);
-  border: 1px solid var(--trovato-color-border);
-  border-radius: var(--trovato-radius-md);
-  background: rgba(255, 255, 255, 0.045);
+  width: 100%;
+  min-height: 112px;
+  margin: 0;
+  padding: var(--trovato-space-lg);
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--trovato-radius-lg);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--trovato-color-text-primary);
-  font: inherit;
-  font-size: var(--trovato-font-size-small);
-  font-weight: var(--trovato-font-weight-medium);
-  line-height: 1.35;
+
+  font-family: var(--trovato-font-family);
   text-align: left;
   cursor: pointer;
   backdrop-filter: blur(12px);
+
   transition:
     transform 160ms ease,
     background 160ms ease,
-    border-color 160ms ease;
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.suggestion-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.suggestion-label {
+  font-size: 1rem;
+  font-weight: var(--trovato-font-weight-semibold);
+  line-height: 1.3;
 }
 
 .suggestions button:hover,
 .suggestions button:focus-visible {
   transform: translateY(-2px);
-  background: rgba(79, 124, 255, 0.1);
+  background: rgba(79, 124, 255, 0.14);
   border-color: rgba(143, 180, 255, 0.5);
+  box-shadow: 0 12px 28px rgba(79, 124, 255, 0.16);
   outline: none;
 }
 
+.suggestions button:active {
+  transform: scale(0.98);
+}
+
+/* ---------------- Conversation ---------------- */
+
+.conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  max-width: 85%;
+  padding: 16px;
+  border-radius: 18px;
+}
+
+.message--assistant {
+  align-self: flex-start;
+
+  background: #ffffff;
+  color: #07101f;
+
+  border-left: 5px solid #4f7cff;
+}
+
+.message--user {
+  align-self: flex-end;
+
+  background: var(--trovato-gradient-primary);
+  color: #ffffff;
+}
+
+.message p {
+  margin: 0;
+  color: inherit;
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+/* ---------------- Composer ---------------- */
+
 .chat-composer {
   margin-top: auto;
-  padding: var(--trovato-space-sm);
-  border: 1px solid var(--trovato-color-border);
-  border-radius: var(--trovato-radius-lg);
-  background: rgba(15, 27, 50, 0.88);
-  backdrop-filter: blur(18px);
+
+  padding: 12px;
+
+  background: rgba(15,27,50,.9);
+
+  border: 1px solid rgba(255,255,255,.08);
+
+  border-radius: 18px;
 }
 
 .chat-composer textarea {
   width: 100%;
-  min-height: 92px;
-  padding: var(--trovato-space-md);
-  border: 0;
-  resize: none;
+  min-height: 90px;
+
+  padding: 14px;
+
   background: transparent;
-  color: var(--trovato-color-text-primary);
-  font-family: var(--trovato-font-family);
-  font-size: var(--trovato-font-size-body);
-  line-height: var(--trovato-line-height-normal);
+
+  border: none;
+
+  resize: none;
+
+  color: #fff;
+
+  font: inherit;
+
   outline: none;
 }
 
@@ -137,41 +215,34 @@ h1 {
 
 .send-button {
   width: 100%;
-  min-height: 52px;
-  border: 0;
-  border-radius: var(--trovato-radius-md);
+  margin-top: 12px;
+
+  height: 52px;
+
+  border: none;
+  border-radius: 14px;
+
   background: var(--trovato-gradient-primary);
-  color: var(--trovato-color-text-primary);
-  font-family: var(--trovato-font-family);
-  font-size: var(--trovato-font-size-body);
-  font-weight: var(--trovato-font-weight-semibold);
+
+  color: #fff;
+
+  font-size: 1rem;
+  font-weight: 600;
+
   cursor: pointer;
-  transition:
-    transform 160ms ease,
-    opacity 160ms ease;
 }
 
-.send-button:hover,
-.send-button:focus-visible {
-  transform: translateY(-1px);
-  opacity: 0.96;
-  outline: none;
+.send-button:hover {
+  opacity: .95;
 }
 
 .sr-only {
   position: absolute;
+
   width: 1px;
   height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
 
-@media (max-width: 360px) {
-  .suggestions {
-    grid-template-columns: 1fr;
-  }
+  overflow: hidden;
+
+  clip: rect(0,0,0,0);
 }
