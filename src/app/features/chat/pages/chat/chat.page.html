@@ -1,0 +1,43 @@
+<ion-content [fullscreen]="true" class="chat-page">
+  <main class="chat-container">
+    <header class="chat-header">
+      <img
+        src="assets/images/trovato-logo.png"
+        alt="Trovato AI"
+        class="chat-logo"
+      />
+
+      <p class="chat-kicker">Your cultural travel assistant</p>
+
+      <h1>What would you like to explore in Italy?</h1>
+
+      <p class="chat-intro">
+        Ask naturally. Tell us the place, date, group size, or type of experience
+        you are looking for.
+      </p>
+    </header>
+
+    <section class="suggestions" aria-label="Suggested searches">
+      <button type="button">Vatican Museums tomorrow</button>
+      <button type="button">Art museums in Florence</button>
+      <button type="button">Family activities in Rome</button>
+      <button type="button">Opera tickets this weekend</button>
+    </section>
+
+    <section class="chat-composer">
+      <label for="travel-request" class="sr-only">
+        Describe what you want to explore
+      </label>
+
+      <textarea
+        id="travel-request"
+        rows="3"
+        placeholder="Example: I need two Vatican Museum tickets tomorrow morning."
+      ></textarea>
+
+      <button type="button" class="send-button">
+        Send
+      </button>
+    </section>
+  </main>
+</ion-content>
