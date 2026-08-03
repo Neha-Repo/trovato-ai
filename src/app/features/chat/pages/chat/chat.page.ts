@@ -1,8 +1,8 @@
 import { Component } from '@angular/core';
-import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { Router } from '@angular/router';
 import { IonContent } from '@ionic/angular/standalone';
+import { firstValueFrom } from 'rxjs';
 
 import { ChatApiService } from '../../../../core/services/chat-api.service';
 import { ChatMessage } from '../../models/chat-message.model';
@@ -30,8 +30,13 @@ export class ChatPage {
     return this.messages.length > 0;
   }
 
-  selectSuggestion(text: string): void {
+  async selectSuggestion(text: string): Promise<void> {
+    if (this.isSending) {
+      return;
+    }
+
     this.userInput = text;
+    await this.sendMessage();
   }
 
   async sendMessage(): Promise<void> {
@@ -56,9 +61,13 @@ export class ChatPage {
         this.chatService.createAssistantMessage(response.reply),
       );
 
-      if (response.searchReady) {
+      if (response.searchReady && response.search) {
         window.setTimeout(() => {
-          void this.router.navigate(['/results']);
+          void this.router.navigate(['/results'], {
+            state: {
+              search: response.search,
+            },
+          });
         }, 900);
       }
     } catch (error: unknown) {

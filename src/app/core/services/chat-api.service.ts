@@ -4,6 +4,13 @@ import { Observable } from 'rxjs';
 
 import { ChatMessage } from '../../features/chat/models/chat-message.model';
 
+export interface SearchRequest {
+  experience: string;
+  city: string;
+  date: string;
+  travellers: number;
+}
+
 interface ChatRequest {
   messages: ChatMessage[];
 }
@@ -11,6 +18,7 @@ interface ChatRequest {
 export interface ChatResponse {
   reply: string;
   searchReady: boolean;
+  search?: SearchRequest;
 }
 
 @Injectable({

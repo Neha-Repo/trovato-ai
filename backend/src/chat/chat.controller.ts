@@ -11,9 +11,17 @@ interface ChatRequest {
   messages: ChatMessageRequest[];
 }
 
+interface SearchRequest {
+  experience: string;
+  city: string;
+  date: string;
+  travellers: number;
+}
+
 interface ChatResponse {
   reply: string;
   searchReady: boolean;
+  search?: SearchRequest;
 }
 
 @Controller('chat')

@@ -15,103 +15,367 @@
       </div>
     </section>
 
-    <section class="availability-summary">
+    <section class="request-summary">
       <div>
-        <p class="summary-label">Availability</p>
-        <h2>
-          @if (selectedSlots.length > 0) {
-            Tickets available
-          } @else {
-            No suitable slots
-          }
-        </h2>
+        <p class="summary-label">Your request</p>
+
+        <h2>{{ result.requestedDate }}</h2>
+
+        <p class="request-detail">
+          {{ result.requestedTicketCount }}
+          {{ result.requestedTicketCount === 1 ? 'traveller' : 'travellers' }}
+        </p>
       </div>
 
-      <div class="traveller-count">
-        {{ result.requestedTicketCount }}
-        {{ result.requestedTicketCount === 1 ? 'traveller' : 'travellers' }}
-      </div>
-    </section>
-
-    <section class="date-section">
-      <div class="section-heading">
-        <p class="section-kicker">Choose a date</p>
-        <h2>{{ selectedDate }}</h2>
-      </div>
-
-      <div class="date-chips" role="list">
-        <button
-          type="button"
-          class="date-chip"
-          [class.date-chip--active]="selectedDate === result.requestedDate"
-          (click)="selectRequestedDate()"
-        >
-          {{ result.requestedDate }}
-        </button>
-
-        @for (date of result.alternateDates; track date.date) {
-          <button
-            type="button"
-            class="date-chip"
-            [class.date-chip--active]="selectedDate === date.date"
-            (click)="selectAlternateDate(date)"
-          >
-            {{ date.date }}
-          </button>
+      @switch (result.state) {
+        @case ('available') {
+          <span class="state-badge state-badge--available">
+            Available
+          </span>
         }
-      </div>
+
+        @case ('alternate-dates') {
+          <span class="state-badge state-badge--warning">
+            Other dates available
+          </span>
+        }
+
+        @case ('no-availability') {
+          <span class="state-badge state-badge--unavailable">
+            Unavailable
+          </span>
+        }
+
+        @case ('group-too-large') {
+          <span class="state-badge state-badge--warning">
+            Group size unavailable
+          </span>
+        }
+
+        @case ('provider-error') {
+          <span class="state-badge state-badge--error">
+            Search interrupted
+          </span>
+        }
+      }
     </section>
 
-    <section class="slots-section">
-      <div class="section-heading">
-        <p class="section-kicker">Available times</p>
-        <h2>
-          {{ selectedSlots.length }}
-          {{ selectedSlots.length === 1 ? 'slot' : 'slots' }}
-        </h2>
-      </div>
+    @switch (result.state) {
+      @case ('available') {
+        <section class="result-section">
+          <div class="section-heading">
+            <p class="section-kicker">Choose a date</p>
+            <h2>{{ selectedDate }}</h2>
+          </div>
 
-      @if (selectedSlots.length > 0) {
-        <div class="slot-list">
-          @for (slot of selectedSlots; track slot.id) {
-            <article class="slot-card">
-              <div class="slot-details">
-                <h3>{{ slot.time }}</h3>
+          <div class="date-chips" aria-label="Available dates">
+            <button
+              type="button"
+              class="date-chip"
+              [class.date-chip--active]="isRequestedDateSelected"
+              (click)="selectRequestedDate()"
+            >
+              {{ result.requestedDate }}
+            </button>
 
-                <p>
-                  {{ slot.availableTickets }}
-                  tickets available
-                </p>
+            @for (date of result.alternateDates; track date.date) {
+              <button
+                type="button"
+                class="date-chip"
+                [class.date-chip--active]="selectedDate === date.date"
+                (click)="selectAlternateDate(date)"
+              >
+                {{ date.date }}
+              </button>
+            }
+          </div>
 
-                <p class="slot-price">
-                  €{{ slot.pricePerPerson }} per person
-                </p>
+          <div class="section-heading section-heading--slots">
+            <p class="section-kicker">Available times</p>
+
+            <h2>
+              {{ selectedSlots.length }}
+              {{ selectedSlots.length === 1 ? 'slot' : 'slots' }}
+            </h2>
+          </div>
+
+          <div class="slot-list">
+            @for (slot of selectedSlots; track slot.id) {
+              <article class="slot-card">
+                <div class="slot-details">
+                  <h3>{{ slot.time }}</h3>
+
+                  <p>
+                    {{ slot.availableTickets }} tickets available
+                  </p>
+
+                  <p class="slot-price">
+                    €{{ slot.pricePerPerson }} per person
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  class="primary-button slot-button"
+                  (click)="continueBooking(slot)"
+                >
+                  Continue Booking
+                </button>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      @case ('alternate-dates') {
+        <section class="result-section">
+          <article class="message-card message-card--warning">
+            <p class="section-kicker">Requested date unavailable</p>
+
+            <h2>No suitable slot for your full group</h2>
+
+            <p>
+              We could not find a time on {{ result.requestedDate }} that can
+              accommodate all {{ result.requestedTicketCount }} travellers.
+            </p>
+
+            <button
+              type="button"
+              class="secondary-button"
+              (click)="notifyMe()"
+            >
+              Notify me
+            </button>
+          </article>
+
+          <div class="section-heading">
+            <p class="section-kicker">Nearby availability</p>
+            <h2>Choose another date</h2>
+          </div>
+
+          <div class="date-chips" aria-label="Alternative available dates">
+            @for (date of result.alternateDates; track date.date) {
+              <button
+                type="button"
+                class="date-chip"
+                [class.date-chip--active]="selectedDate === date.date"
+                (click)="selectAlternateDate(date)"
+              >
+                {{ date.date }}
+              </button>
+            }
+          </div>
+
+          @if (selectedSlots.length > 0) {
+            <div class="section-heading section-heading--slots">
+              <p class="section-kicker">Available times</p>
+
+              <h2>
+                {{ selectedSlots.length }}
+                {{ selectedSlots.length === 1 ? 'slot' : 'slots' }}
+              </h2>
+            </div>
+
+            <div class="slot-list">
+              @for (slot of selectedSlots; track slot.id) {
+                <article class="slot-card">
+                  <div class="slot-details">
+                    <h3>{{ slot.time }}</h3>
+
+                    <p>
+                      {{ slot.availableTickets }} tickets available
+                    </p>
+
+                    <p class="slot-price">
+                      €{{ slot.pricePerPerson }} per person
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="primary-button slot-button"
+                    (click)="continueBooking(slot)"
+                  >
+                    Continue Booking
+                  </button>
+                </article>
+              }
+            </div>
+          } @else {
+            <article class="selection-hint">
+              <p>Select an available date to view its time slots.</p>
+            </article>
+          }
+        </section>
+      }
+
+      @case ('no-availability') {
+        <section class="result-section">
+          <article class="message-card message-card--unavailable">
+            <p class="section-kicker">No current availability</p>
+
+            <h2>We could not find a bookable date</h2>
+
+            <p>
+              There are currently no suitable slots for
+              {{ result.requestedTicketCount }} travellers on the requested date
+              or nearby dates.
+            </p>
+
+            <button
+              type="button"
+              class="primary-button"
+              (click)="notifyMe()"
+            >
+              Notify me
+            </button>
+          </article>
+
+          @if (hasSuggestedExperiences) {
+            <div class="section-heading alternatives-heading">
+              <p class="section-kicker">Other possibilities</p>
+              <h2>You may also like</h2>
+            </div>
+
+            <div class="experience-list">
+              @for (
+                experience of result.suggestedExperiences ?? [];
+                track experience.id
+              ) {
+                <article class="experience-card">
+                  <img
+                    [src]="experience.imageUrl"
+                    [alt]="experience.title"
+                    class="experience-image"
+                  />
+
+                  <div class="experience-content">
+                    <h3>{{ experience.title }}</h3>
+                    <p>{{ experience.location }}</p>
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </section>
+      }
+
+      @case ('group-too-large') {
+        <section class="result-section">
+          <article class="message-card message-card--warning">
+            <p class="section-kicker">Group size unavailable</p>
+
+            <h2>No single slot can fit your full group</h2>
+
+            <p>
+              You requested availability for
+              {{ result.requestedTicketCount }} travellers.
+            </p>
+
+            @if (result.largestAvailableGroupSize) {
+              <div class="capacity-summary">
+                <span>Largest group currently supported</span>
+
+                <strong>
+                  {{ result.largestAvailableGroupSize }} travellers
+                </strong>
               </div>
+            }
+
+            <button
+              type="button"
+              class="primary-button"
+              (click)="notifyMe()"
+            >
+              Notify me
+            </button>
+          </article>
+
+          @if (hasAlternateDates) {
+            <div class="section-heading">
+              <p class="section-kicker">Other dates</p>
+              <h2>Check nearby availability</h2>
+            </div>
+
+            <div class="date-chips">
+              @for (date of result.alternateDates; track date.date) {
+                <button
+                  type="button"
+                  class="date-chip"
+                  [class.date-chip--active]="selectedDate === date.date"
+                  (click)="selectAlternateDate(date)"
+                >
+                  {{ date.date }}
+                </button>
+              }
+            </div>
+          }
+
+          @if (hasSuggestedExperiences) {
+            <div class="section-heading alternatives-heading">
+              <p class="section-kicker">Other possibilities</p>
+              <h2>Experiences that may fit your group</h2>
+            </div>
+
+            <div class="experience-list">
+              @for (
+                experience of result.suggestedExperiences ?? [];
+                track experience.id
+              ) {
+                <article class="experience-card">
+                  <img
+                    [src]="experience.imageUrl"
+                    [alt]="experience.title"
+                    class="experience-image"
+                  />
+
+                  <div class="experience-content">
+                    <h3>{{ experience.title }}</h3>
+                    <p>{{ experience.location }}</p>
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </section>
+      }
+
+      @case ('provider-error') {
+        <section class="result-section">
+          <article class="message-card message-card--error">
+            <div class="error-icon" aria-hidden="true">!</div>
+
+            <p class="section-kicker">Availability unavailable</p>
+
+            <h2>We could not complete the search</h2>
+
+            <p>
+              {{
+                result.errorMessage ??
+                  'Live availability could not be retrieved. Please try again.'
+              }}
+            </p>
+
+            <div class="error-actions">
+              <button
+                type="button"
+                class="primary-button"
+                (click)="retryAvailability()"
+              >
+                Try again
+              </button>
 
               <button
                 type="button"
-                class="continue-button"
-                (click)="continueBooking(slot)"
+                class="secondary-button"
+                (click)="goBackToChat()"
               >
-                Continue Booking
+                Back to chat
               </button>
-            </article>
-          }
-        </div>
-      } @else {
-        <section class="unavailable-card">
-          <h3>No slot fits your group on this date</h3>
-
-          <p>
-            Choose another available date or ask to be notified when a suitable
-            slot becomes available.
-          </p>
-
-          <button type="button" class="notify-button">
-            Notify me
-          </button>
+            </div>
+          </article>
         </section>
       }
-    </section>
+    }
   </main>
 </ion-content>

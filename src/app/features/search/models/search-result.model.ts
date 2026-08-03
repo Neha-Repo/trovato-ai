@@ -1,4 +1,9 @@
-export type SearchResultStatus = 'available' | 'unavailable';
+export type SearchResultState =
+  | 'available'
+  | 'alternate-dates'
+  | 'no-availability'
+  | 'group-too-large'
+  | 'provider-error';
 
 export interface AvailabilitySlot {
   id: string;
@@ -29,10 +34,13 @@ export interface SearchResult {
   requestedDate: string;
   requestedTicketCount: number;
 
-  status: SearchResultStatus;
+  state: SearchResultState;
 
   requestedDateSlots: AvailabilitySlot[];
   alternateDates: AvailableDate[];
+
+  largestAvailableGroupSize?: number;
+  errorMessage?: string;
 
   suggestedExperiences?: SuggestedExperience[];
 }

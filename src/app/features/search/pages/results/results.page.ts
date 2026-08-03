@@ -1,6 +1,8 @@
 import { Component } from '@angular/core';
+import { Router } from '@angular/router';
 import { IonContent } from '@ionic/angular/standalone';
 
+import { SearchRequest } from '../../../../core/services/chat-api.service';
 import {
   AvailabilitySlot,
   AvailableDate,
@@ -23,10 +25,39 @@ export class ResultsPage {
 
   constructor(
     private readonly searchResultsService: SearchResultsService,
+    private readonly router: Router,
   ) {
-    this.result = this.searchResultsService.getAvailableResult();
+    const navigation = this.router.getCurrentNavigation();
+
+    const search = navigation?.extras.state?.['search'] as
+      | SearchRequest
+      | undefined;
+
+    this.result = this.searchResultsService.search(
+      search
+        ? {
+            requestedDate: search.date,
+            requestedTicketCount: search.travellers,
+          }
+        : undefined,
+    );
+
     this.selectedDate = this.result.requestedDate;
     this.selectedSlots = this.result.requestedDateSlots;
+  }
+
+  get hasAlternateDates(): boolean {
+    return this.result.alternateDates.some(
+      (date) => date.slots.length > 0,
+    );
+  }
+
+  get hasSuggestedExperiences(): boolean {
+    return (this.result.suggestedExperiences?.length ?? 0) > 0;
+  }
+
+  get isRequestedDateSelected(): boolean {
+    return this.selectedDate === this.result.requestedDate;
   }
 
   selectRequestedDate(): void {
@@ -41,5 +72,21 @@ export class ResultsPage {
 
   continueBooking(slot: AvailabilitySlot): void {
     window.open(slot.bookingUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  notifyMe(): void {
+    console.log('Notification requested', {
+      experienceId: this.result.id,
+      date: this.result.requestedDate,
+      ticketCount: this.result.requestedTicketCount,
+    });
+  }
+
+  retryAvailability(): void {
+    window.location.reload();
+  }
+
+  goBackToChat(): void {
+    void this.router.navigate(['/chat']);
   }
 }
