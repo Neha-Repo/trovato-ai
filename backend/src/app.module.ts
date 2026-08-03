@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ChatController } from './chat/chat.controller';
 import { ChatService } from './chat/chat.service';
+import { OllamaService } from './chat/ollama.service';
 
 @Module({
   imports: [
@@ -13,6 +14,6 @@ import { ChatService } from './chat/chat.service';
     }),
   ],
   controllers: [AppController, ChatController],
-  providers: [AppService, ChatService],
+  providers: [AppService, ChatService, OllamaService],
 })
 export class AppModule {}

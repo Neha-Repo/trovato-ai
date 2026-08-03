@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-
+import { OllamaService } from './ollama.service';
 interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
@@ -25,9 +25,8 @@ interface ExtractedDate {
 
 @Injectable()
 export class ChatService {
+  constructor(private readonly ollamaService: OllamaService) {}
   async sendMessage(messages: ChatMessage[]): Promise<ChatResponse> {
-    await this.simulateDelay();
-
     const userMessages = messages
       .filter((message) => message.sender === 'user')
       .map((message) => message.text.trim().toLowerCase());
@@ -35,13 +34,31 @@ export class ChatService {
     const latestUserMessage = userMessages.at(-1) ?? '';
     const conversation = userMessages.join(' ');
 
-    const experience = this.extractExperience(conversation);
-    const city = this.extractCity(conversation);
-    const extractedDate = this.extractDate(userMessages);
-    const travellers = this.extractTravellerCount(
+    let experience = this.extractExperience(conversation);
+    let city = this.extractCity(conversation);
+    let extractedDate = this.extractDate(userMessages);
+    let travellers = this.extractTravellerCount(
       conversation,
       latestUserMessage,
     );
+
+    try {
+      const aiSearch = await this.ollamaService.extractSearch(messages);
+
+      experience = aiSearch.experience ?? experience;
+      city = aiSearch.city ?? city;
+      travellers = aiSearch.travellers ?? travellers;
+
+      if (aiSearch.date) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        extractedDate =
+          this.extractDate([aiSearch.date]) ??
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+          this.extractIsoLikeDate(aiSearch.date);
+      }
+    } catch (error) {
+      console.warn('Falling back to rule-based extraction.', error);
+    }
 
     if (!experience) {
       return {
