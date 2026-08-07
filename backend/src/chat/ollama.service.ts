@@ -28,7 +28,7 @@ interface OllamaChatResponse {
 export class OllamaService {
   private readonly baseUrl = 'http://localhost:11434';
   private readonly model = 'llama3.2:1b';
-  private readonly timeoutMilliseconds = 60_000;
+  private readonly timeoutMilliseconds = 90_000;
 
   async extractSearch(messages: ChatMessage[]): Promise<ExtractedSearch> {
     const ollamaMessages: OllamaMessage[] = [

@@ -7,8 +7,14 @@ import {
   SearchResultState,
   SuggestedExperience,
 } from '../models/search-result.model';
+import {
+  Experience,
+  ExperienceCatalogService,
+} from './experience-catalog.service';
 
 interface SearchRequest {
+  experience?: string;
+  city?: string;
   requestedDate: string;
   requestedTicketCount: number;
 }
@@ -29,11 +35,10 @@ interface NormalizedDate {
   providedIn: 'root',
 })
 export class SearchResultsService {
-  private readonly bookingUrl =
-    'https://tickets.museivaticani.va/home/calendar/visit/Biglietti-Musei';
-
   private readonly defaultRequest: SearchRequest = {
-    requestedDate: '3 August 2026',
+    experience: 'Vatican Museums',
+    city: 'Rome',
+    requestedDate: 'tomorrow',
     requestedTicketCount: 3,
   };
 
@@ -58,17 +63,29 @@ export class SearchResultsService {
     },
   ];
 
+  constructor(
+    private readonly experienceCatalogService: ExperienceCatalogService,
+  ) {}
+
   search(request: SearchRequest = this.defaultRequest): SearchResult {
-    const providerAvailability =
-      this.getMockProviderAvailability(request.requestedDate);
+    const experience = this.resolveExperience(request.experience);
+
+    const providerAvailability = this.getMockProviderAvailability(
+      request.requestedDate,
+      experience.bookingUrl,
+      experience.id,
+    );
 
     const normalizedRequest: SearchRequest = {
+      ...request,
+      experience: experience.title,
+      city: request.city ?? experience.location,
       requestedDate: providerAvailability.requestedDate,
-      requestedTicketCount: request.requestedTicketCount,
     };
 
     if (providerAvailability.providerError) {
       return this.createResult({
+        experience,
         request: normalizedRequest,
         state: 'provider-error',
         requestedDateSlots: [],
@@ -118,6 +135,7 @@ export class SearchResultsService {
     });
 
     return this.createResult({
+      experience,
       request: normalizedRequest,
       state,
       requestedDateSlots,
@@ -129,6 +147,27 @@ export class SearchResultsService {
           ? this.suggestedExperiences
           : undefined,
     });
+  }
+
+  private resolveExperience(title?: string): Experience {
+    const requestedExperience = title
+      ? this.experienceCatalogService.getByTitle(title)
+      : null;
+
+    if (requestedExperience) {
+      return requestedExperience;
+    }
+
+    const defaultExperience =
+      this.experienceCatalogService.getByTitle('Vatican Museums');
+
+    if (!defaultExperience) {
+      throw new Error(
+        'Vatican Museums is missing from the experience catalog.',
+      );
+    }
+
+    return defaultExperience;
   }
 
   private determineState(options: {
@@ -163,6 +202,7 @@ export class SearchResultsService {
   }
 
   private createResult(options: {
+    experience: Experience;
     request: SearchRequest;
     state: SearchResultState;
     requestedDateSlots: AvailabilitySlot[];
@@ -172,10 +212,10 @@ export class SearchResultsService {
     suggestedExperiences?: SuggestedExperience[];
   }): SearchResult {
     return {
-      id: 'vatican-museums',
-      title: 'Vatican Museums',
-      location: 'Vatican City, Rome',
-      imageUrl: 'assets/images/vatican-museums.jpg',
+      id: options.experience.id,
+      title: options.experience.title,
+      location: options.experience.location,
+      imageUrl: options.experience.imageUrl,
 
       requestedDate: options.request.requestedDate,
       requestedTicketCount:
@@ -218,8 +258,18 @@ export class SearchResultsService {
 
   private getMockProviderAvailability(
     requestedDate: string,
+    bookingUrl: string,
+    experienceId: string,
   ): ProviderAvailability {
     const normalizedDate = this.normalizeDate(requestedDate);
+
+    /*
+     * Temporary deterministic test cases.
+     *
+     * These are still useful while developing the five Results states.
+     * Later, provider failures and empty availability will come from
+     * real provider responses instead of special dates.
+     */
 
     if (normalizedDate.key === '1-january-2027') {
       return {
@@ -239,7 +289,10 @@ export class SearchResultsService {
       };
     }
 
-    const inventory = this.createMockInventory();
+    const inventory = this.createMockInventory(
+      bookingUrl,
+      experienceId,
+    );
 
     const requestedDateSlots =
       inventory[normalizedDate.key] ?? [];
@@ -257,91 +310,230 @@ export class SearchResultsService {
     };
   }
 
-  private createMockInventory(): Record<
-    string,
-    AvailabilitySlot[]
-  > {
+  private getFutureDate(daysFromToday: number): Date {
+    const date = new Date();
+
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + daysFromToday);
+
+    return date;
+  }
+
+  private createDateInfo(date: Date): NormalizedDate {
+    const day = date.getDate();
+
+    const month = new Intl.DateTimeFormat('en-GB', {
+      month: 'long',
+    })
+      .format(date)
+      .toLowerCase();
+
+    const year = date.getFullYear();
+
     return {
-      '3-august-2026': [
-        this.createSlot(
-          'vatican-2026-08-03-0900',
-          '9:00 AM',
-          2,
-          18,
-        ),
-        this.createSlot(
-          'vatican-2026-08-03-1100',
-          '11:00 AM',
-          5,
-          20,
-        ),
-        this.createSlot(
-          'vatican-2026-08-03-1400',
-          '2:00 PM',
-          8,
-          24,
-        ),
-      ],
-
-      '4-august-2026': [
-        this.createSlot(
-          'vatican-2026-08-04-0900',
-          '9:00 AM',
-          6,
-          20,
-        ),
-        this.createSlot(
-          'vatican-2026-08-04-1300',
-          '1:00 PM',
-          10,
-          22,
-        ),
-      ],
-
-      '5-august-2026': [],
-
-      '6-august-2026': [
-        this.createSlot(
-          'vatican-2026-08-06-1200',
-          '12:00 PM',
-          9,
-          24,
-        ),
-      ],
+      key: `${day}-${month}-${year}`,
+      displayDate: new Intl.DateTimeFormat('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(date),
     };
+  }
+
+  private createMockInventory(
+    bookingUrl: string,
+    experienceId: string,
+  ): Record<string, AvailabilitySlot[]> {
+    const date1 = this.createDateInfo(
+      this.getFutureDate(1),
+    );
+
+    const date2 = this.createDateInfo(
+      this.getFutureDate(2),
+    );
+
+    const date3 = this.createDateInfo(
+      this.getFutureDate(3),
+    );
+
+    const date4 = this.createDateInfo(
+      this.getFutureDate(4),
+    );
+
+    switch (experienceId) {
+      case 'uffizi-gallery':
+        return {
+          [date1.key]: [
+            this.createSlot(
+              `${experienceId}-${date1.key}-0830`,
+              '8:30 AM',
+              4,
+              25,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date1.key}-1045`,
+              '10:45 AM',
+              7,
+              29,
+              bookingUrl,
+            ),
+          ],
+
+          [date2.key]: [
+            this.createSlot(
+              `${experienceId}-${date2.key}-0915`,
+              '9:15 AM',
+              5,
+              25,
+              bookingUrl,
+            ),
+          ],
+
+          [date3.key]: [],
+
+          [date4.key]: [
+            this.createSlot(
+              `${experienceId}-${date4.key}-1130`,
+              '11:30 AM',
+              8,
+              29,
+              bookingUrl,
+            ),
+          ],
+        };
+
+      case 'colosseum':
+        return {
+          [date1.key]: [
+            this.createSlot(
+              `${experienceId}-${date1.key}-0900`,
+              '9:00 AM',
+              10,
+              18,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date1.key}-1230`,
+              '12:30 PM',
+              6,
+              22,
+              bookingUrl,
+            ),
+          ],
+
+          [date2.key]: [
+            this.createSlot(
+              `${experienceId}-${date2.key}-1000`,
+              '10:00 AM',
+              12,
+              20,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date2.key}-1530`,
+              '3:30 PM',
+              4,
+              24,
+              bookingUrl,
+            ),
+          ],
+
+          [date3.key]: [
+            this.createSlot(
+              `${experienceId}-${date3.key}-1100`,
+              '11:00 AM',
+              3,
+              20,
+              bookingUrl,
+            ),
+          ],
+
+          [date4.key]: [],
+        };
+
+      case 'vatican-museums':
+      default:
+        return {
+          [date1.key]: [
+            this.createSlot(
+              `${experienceId}-${date1.key}-0900`,
+              '9:00 AM',
+              2,
+              18,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date1.key}-1100`,
+              '11:00 AM',
+              5,
+              20,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date1.key}-1400`,
+              '2:00 PM',
+              8,
+              24,
+              bookingUrl,
+            ),
+          ],
+
+          [date2.key]: [
+            this.createSlot(
+              `${experienceId}-${date2.key}-0900`,
+              '9:00 AM',
+              6,
+              20,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date2.key}-1300`,
+              '1:00 PM',
+              10,
+              22,
+              bookingUrl,
+            ),
+          ],
+
+          [date3.key]: [],
+
+          [date4.key]: [
+            this.createSlot(
+              `${experienceId}-${date4.key}-1200`,
+              '12:00 PM',
+              9,
+              24,
+              bookingUrl,
+            ),
+          ],
+        };
+    }
   }
 
   private getAlternateDates(
     requestedDateKey: string,
     inventory: Record<string, AvailabilitySlot[]>,
   ): AvailableDate[] {
-    const dateOrder = [
-      {
-        key: '3-august-2026',
-        displayDate: '3 August 2026',
-      },
-      {
-        key: '4-august-2026',
-        displayDate: '4 August 2026',
-      },
-      {
-        key: '5-august-2026',
-        displayDate: '5 August 2026',
-      },
-      {
-        key: '6-august-2026',
-        displayDate: '6 August 2026',
-      },
-    ];
-
-    return dateOrder
-      .filter((date) => date.key !== requestedDateKey)
-      .map((date) => ({
-        date: date.displayDate,
-        slots: inventory[date.key] ?? [],
+    return Object.entries(inventory)
+      .filter(
+        ([dateKey, slots]) =>
+          dateKey !== requestedDateKey &&
+          slots.length > 0,
+      )
+      .map(([dateKey, slots]) => ({
+        date: this.displayDateFromKey(dateKey),
+        slots,
       }))
-      .filter((date) => date.slots.length > 0)
       .slice(0, 3);
+  }
+
+  private displayDateFromKey(dateKey: string): string {
+    const [day, month, year] = dateKey.split('-');
+
+    return `${Number(day)} ${
+      month.charAt(0).toUpperCase() + month.slice(1)
+    } ${year}`;
   }
 
   private normalizeDate(value: string): NormalizedDate {
@@ -352,17 +544,15 @@ export class SearchResultsService {
       .replace(/\s+/g, ' ');
 
     if (normalizedValue === 'today') {
-      return {
-        key: '3-august-2026',
-        displayDate: '3 August 2026',
-      };
+      return this.createDateInfo(
+        this.getFutureDate(0),
+      );
     }
 
     if (normalizedValue === 'tomorrow') {
-      return {
-        key: '4-august-2026',
-        displayDate: '4 August 2026',
-      };
+      return this.createDateInfo(
+        this.getFutureDate(1),
+      );
     }
 
     const monthNames: Record<string, string> = {
@@ -406,11 +596,15 @@ export class SearchResultsService {
     if (dayMonthMatch) {
       day = dayMonthMatch[1];
       monthInput = dayMonthMatch[2];
-      year = dayMonthMatch[3] ?? '2026';
+      year =
+        dayMonthMatch[3] ??
+        String(new Date().getFullYear());
     } else if (monthDayMatch) {
       monthInput = monthDayMatch[1];
       day = monthDayMatch[2];
-      year = monthDayMatch[3] ?? '2026';
+      year =
+        monthDayMatch[3] ??
+        String(new Date().getFullYear());
     } else {
       return {
         key: normalizedValue.replace(/\s+/g, '-'),
@@ -428,12 +622,15 @@ export class SearchResultsService {
     }
 
     const normalizedDay = String(Number(day));
+
     const capitalizedMonth =
-      month.charAt(0).toUpperCase() + month.slice(1);
+      month.charAt(0).toUpperCase() +
+      month.slice(1);
 
     return {
       key: `${normalizedDay}-${month}-${year}`,
-      displayDate: `${normalizedDay} ${capitalizedMonth} ${year}`,
+      displayDate:
+        `${normalizedDay} ${capitalizedMonth} ${year}`,
     };
   }
 
@@ -442,13 +639,14 @@ export class SearchResultsService {
     time: string,
     availableTickets: number,
     pricePerPerson: number,
+    bookingUrl: string,
   ): AvailabilitySlot {
     return {
       id,
       time,
       availableTickets,
       pricePerPerson,
-      bookingUrl: this.bookingUrl,
+      bookingUrl,
     };
   }
 }

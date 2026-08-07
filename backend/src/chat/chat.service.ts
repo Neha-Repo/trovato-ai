@@ -50,12 +50,8 @@ export class ChatService {
       travellers = aiSearch.travellers ?? travellers;
 
       if (aiSearch.date) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        extractedDate =
-          this.extractDate([aiSearch.date]) ??
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-          this.extractIsoLikeDate(aiSearch.date);
-      }
+  extractedDate = this.extractDate([aiSearch.date]);
+}
     } catch (error) {
       console.warn('Falling back to rule-based extraction.', error);
     }

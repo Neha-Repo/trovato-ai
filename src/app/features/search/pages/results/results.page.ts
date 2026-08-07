@@ -36,6 +36,8 @@ export class ResultsPage {
     this.result = this.searchResultsService.search(
       search
         ? {
+            experience: search.experience,
+            city: search.city,
             requestedDate: search.date,
             requestedTicketCount: search.travellers,
           }
