@@ -42,27 +42,6 @@ export class SearchResultsService {
     requestedTicketCount: 3,
   };
 
-  private readonly suggestedExperiences: SuggestedExperience[] = [
-    {
-      id: 'castel-sant-angelo',
-      title: 'Castel Sant’Angelo',
-      location: 'Rome',
-      imageUrl: 'assets/images/castel-sant-angelo.jpg',
-    },
-    {
-      id: 'borghese-gallery',
-      title: 'Borghese Gallery',
-      location: 'Rome',
-      imageUrl: 'assets/images/borghese-gallery.jpg',
-    },
-    {
-      id: 'capitoline-museums',
-      title: 'Capitoline Museums',
-      location: 'Rome',
-      imageUrl: 'assets/images/capitoline-museums.jpg',
-    },
-  ];
-
   constructor(
     private readonly experienceCatalogService: ExperienceCatalogService,
   ) {}
@@ -79,7 +58,7 @@ export class SearchResultsService {
     const normalizedRequest: SearchRequest = {
       ...request,
       experience: experience.title,
-      city: request.city ?? experience.location,
+      city: request.city ?? experience.city,
       requestedDate: providerAvailability.requestedDate,
     };
 
@@ -144,7 +123,10 @@ export class SearchResultsService {
       suggestedExperiences:
         state === 'no-availability' ||
         state === 'group-too-large'
-          ? this.suggestedExperiences
+          ? this.getSuggestedExperiences(
+              experience,
+              normalizedRequest.city,
+            )
           : undefined,
     });
   }
@@ -159,7 +141,9 @@ export class SearchResultsService {
     }
 
     const defaultExperience =
-      this.experienceCatalogService.getByTitle('Vatican Museums');
+      this.experienceCatalogService.getByTitle(
+        'Vatican Museums',
+      );
 
     if (!defaultExperience) {
       throw new Error(
@@ -168,6 +152,25 @@ export class SearchResultsService {
     }
 
     return defaultExperience;
+  }
+
+  private getSuggestedExperiences(
+    experience: Experience,
+    city?: string,
+  ): SuggestedExperience[] {
+    const alternatives =
+      this.experienceCatalogService.getAlternatives(
+        experience.id,
+        city ?? experience.city,
+        3,
+      );
+
+    return alternatives.map((alternative) => ({
+      id: alternative.id,
+      title: alternative.title,
+      location: alternative.location,
+      imageUrl: alternative.imageUrl,
+    }));
   }
 
   private determineState(options: {
@@ -261,16 +264,12 @@ export class SearchResultsService {
     bookingUrl: string,
     experienceId: string,
   ): ProviderAvailability {
-    const normalizedDate = this.normalizeDate(requestedDate);
+    const normalizedDate =
+      this.normalizeDate(requestedDate);
 
     /*
-     * Temporary deterministic test cases.
-     *
-     * These are still useful while developing the five Results states.
-     * Later, provider failures and empty availability will come from
-     * real provider responses instead of special dates.
+     * Temporary deterministic provider-error test.
      */
-
     if (normalizedDate.key === '1-january-2027') {
       return {
         providerError: true,
@@ -280,7 +279,12 @@ export class SearchResultsService {
       };
     }
 
-    if (normalizedDate.key === '31-december-2026') {
+    /*
+     * Temporary deterministic no-availability test.
+     */
+    if (
+      normalizedDate.key === '31-december-2026'
+    ) {
       return {
         providerError: false,
         requestedDate: normalizedDate.displayDate,
@@ -310,33 +314,41 @@ export class SearchResultsService {
     };
   }
 
-  private getFutureDate(daysFromToday: number): Date {
+  private getFutureDate(
+    daysFromToday: number,
+  ): Date {
     const date = new Date();
 
     date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() + daysFromToday);
+    date.setDate(
+      date.getDate() + daysFromToday,
+    );
 
     return date;
   }
 
-  private createDateInfo(date: Date): NormalizedDate {
+  private createDateInfo(
+    date: Date,
+  ): NormalizedDate {
     const day = date.getDate();
 
-    const month = new Intl.DateTimeFormat('en-GB', {
-      month: 'long',
-    })
-      .format(date)
-      .toLowerCase();
+    const month =
+      new Intl.DateTimeFormat('en-GB', {
+        month: 'long',
+      })
+        .format(date)
+        .toLowerCase();
 
     const year = date.getFullYear();
 
     return {
       key: `${day}-${month}-${year}`,
-      displayDate: new Intl.DateTimeFormat('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }).format(date),
+      displayDate:
+        new Intl.DateTimeFormat('en-GB', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }).format(date),
     };
   }
 
@@ -452,6 +464,132 @@ export class SearchResultsService {
           [date4.key]: [],
         };
 
+      case 'pompeii':
+        return {
+          [date1.key]: [
+            this.createSlot(
+              `${experienceId}-${date1.key}-0900`,
+              '9:00 AM',
+              8,
+              20,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date1.key}-1130`,
+              '11:30 AM',
+              10,
+              22,
+              bookingUrl,
+            ),
+          ],
+
+          [date2.key]: [
+            this.createSlot(
+              `${experienceId}-${date2.key}-1000`,
+              '10:00 AM',
+              6,
+              20,
+              bookingUrl,
+            ),
+          ],
+
+          [date3.key]: [],
+
+          [date4.key]: [
+            this.createSlot(
+              `${experienceId}-${date4.key}-1300`,
+              '1:00 PM',
+              12,
+              24,
+              bookingUrl,
+            ),
+          ],
+        };
+
+      case 'accademia-gallery':
+        return {
+          [date1.key]: [
+            this.createSlot(
+              `${experienceId}-${date1.key}-0845`,
+              '8:45 AM',
+              5,
+              18,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date1.key}-1100`,
+              '11:00 AM',
+              7,
+              22,
+              bookingUrl,
+            ),
+          ],
+
+          [date2.key]: [
+            this.createSlot(
+              `${experienceId}-${date2.key}-0930`,
+              '9:30 AM',
+              6,
+              20,
+              bookingUrl,
+            ),
+          ],
+
+          [date3.key]: [],
+
+          [date4.key]: [
+            this.createSlot(
+              `${experienceId}-${date4.key}-1430`,
+              '2:30 PM',
+              8,
+              22,
+              bookingUrl,
+            ),
+          ],
+        };
+
+      case 'borghese-gallery':
+        return {
+          [date1.key]: [
+            this.createSlot(
+              `${experienceId}-${date1.key}-0900`,
+              '9:00 AM',
+              4,
+              17,
+              bookingUrl,
+            ),
+            this.createSlot(
+              `${experienceId}-${date1.key}-1300`,
+              '1:00 PM',
+              6,
+              20,
+              bookingUrl,
+            ),
+          ],
+
+          [date2.key]: [
+            this.createSlot(
+              `${experienceId}-${date2.key}-1100`,
+              '11:00 AM',
+              5,
+              19,
+              bookingUrl,
+            ),
+          ],
+
+          [date3.key]: [],
+
+          [date4.key]: [
+            this.createSlot(
+              `${experienceId}-${date4.key}-1500`,
+              '3:00 PM',
+              8,
+              21,
+              bookingUrl,
+            ),
+          ],
+        };
+
       case 'vatican-museums':
       default:
         return {
@@ -513,7 +651,10 @@ export class SearchResultsService {
 
   private getAlternateDates(
     requestedDateKey: string,
-    inventory: Record<string, AvailabilitySlot[]>,
+    inventory: Record<
+      string,
+      AvailabilitySlot[]
+    >,
   ): AvailableDate[] {
     return Object.entries(inventory)
       .filter(
@@ -522,21 +663,28 @@ export class SearchResultsService {
           slots.length > 0,
       )
       .map(([dateKey, slots]) => ({
-        date: this.displayDateFromKey(dateKey),
+        date:
+          this.displayDateFromKey(dateKey),
         slots,
       }))
       .slice(0, 3);
   }
 
-  private displayDateFromKey(dateKey: string): string {
-    const [day, month, year] = dateKey.split('-');
+  private displayDateFromKey(
+    dateKey: string,
+  ): string {
+    const [day, month, year] =
+      dateKey.split('-');
 
     return `${Number(day)} ${
-      month.charAt(0).toUpperCase() + month.slice(1)
+      month.charAt(0).toUpperCase() +
+      month.slice(1)
     } ${year}`;
   }
 
-  private normalizeDate(value: string): NormalizedDate {
+  private normalizeDate(
+    value: string,
+  ): NormalizedDate {
     const normalizedValue = value
       .trim()
       .toLowerCase()
@@ -555,7 +703,10 @@ export class SearchResultsService {
       );
     }
 
-    const monthNames: Record<string, string> = {
+    const monthNames: Record<
+      string,
+      string
+    > = {
       jan: 'january',
       january: 'january',
       feb: 'february',
@@ -581,13 +732,15 @@ export class SearchResultsService {
       december: 'december',
     };
 
-    const dayMonthMatch = normalizedValue.match(
-      /^(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?$/,
-    );
+    const dayMonthMatch =
+      normalizedValue.match(
+        /^(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?$/,
+      );
 
-    const monthDayMatch = normalizedValue.match(
-      /^([a-z]+)\s+(\d{1,2})(?:\s+(\d{4}))?$/,
-    );
+    const monthDayMatch =
+      normalizedValue.match(
+        /^([a-z]+)\s+(\d{1,2})(?:\s+(\d{4}))?$/,
+      );
 
     let day: string;
     let monthInput: string;
@@ -607,28 +760,40 @@ export class SearchResultsService {
         String(new Date().getFullYear());
     } else {
       return {
-        key: normalizedValue.replace(/\s+/g, '-'),
+        key:
+          normalizedValue.replace(
+            /\s+/g,
+            '-',
+          ),
         displayDate: value,
       };
     }
 
-    const month = monthNames[monthInput];
+    const month =
+      monthNames[monthInput];
 
     if (!month) {
       return {
-        key: normalizedValue.replace(/\s+/g, '-'),
+        key:
+          normalizedValue.replace(
+            /\s+/g,
+            '-',
+          ),
         displayDate: value,
       };
     }
 
-    const normalizedDay = String(Number(day));
+    const normalizedDay = String(
+      Number(day),
+    );
 
     const capitalizedMonth =
       month.charAt(0).toUpperCase() +
       month.slice(1);
 
     return {
-      key: `${normalizedDay}-${month}-${year}`,
+      key:
+        `${normalizedDay}-${month}-${year}`,
       displayDate:
         `${normalizedDay} ${capitalizedMonth} ${year}`,
     };
