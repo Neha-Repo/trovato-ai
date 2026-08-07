@@ -3,7 +3,12 @@ export type SearchResultState =
   | 'alternate-dates'
   | 'no-availability'
   | 'group-too-large'
-  | 'provider-error';
+  | 'provider-error'
+  | 'unsupported-experience';
+
+export type SuggestedExperienceState =
+  | 'available'
+  | 'alternate-dates';
 
 export interface AvailabilitySlot {
   id: string;
@@ -21,15 +26,23 @@ export interface AvailableDate {
 export interface SuggestedExperience {
   id: string;
   title: string;
+  city: string;
   location: string;
   imageUrl: string;
+
+  state: SuggestedExperienceState;
+
+  requestedDate: string;
+  requestedDateSlots: AvailabilitySlot[];
+  alternateDates: AvailableDate[];
 }
 
 export interface SearchResult {
   id: string;
   title: string;
+  city: string;
   location: string;
-  imageUrl: string;
+  imageUrl?: string;
 
   requestedDate: string;
   requestedTicketCount: number;

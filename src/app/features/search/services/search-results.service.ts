@@ -31,6 +31,33 @@ interface NormalizedDate {
   displayDate: string;
 }
 
+interface ExperienceEvaluation {
+  providerError: boolean;
+
+  requestedDate: string;
+  requestedDateSlots: AvailabilitySlot[];
+
+  alternateDates: AvailableDate[];
+
+  largestAvailableGroupSize: number;
+
+  state: Exclude<
+    SearchResultState,
+    'unsupported-experience'
+  >;
+}
+
+interface MockSlotTemplate {
+  time: string;
+  availableTickets: number;
+  pricePerPerson: number;
+}
+
+interface MockDayTemplate {
+  daysFromToday: number;
+  slots: MockSlotTemplate[];
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -46,131 +73,273 @@ export class SearchResultsService {
     private readonly experienceCatalogService: ExperienceCatalogService,
   ) {}
 
-  search(request: SearchRequest = this.defaultRequest): SearchResult {
-    const experience = this.resolveExperience(request.experience);
-
-    const providerAvailability = this.getMockProviderAvailability(
-      request.requestedDate,
-      experience.bookingUrl,
-      experience.id,
+  search(
+    request: SearchRequest = this.defaultRequest,
+  ): SearchResult {
+    const experience = this.resolveExperience(
+      request.experience,
     );
 
+    if (!experience) {
+      return this.createUnsupportedResult(request);
+    }
+
+    /*
+     * The catalog owns the canonical location.
+     *
+     * If somebody asks for "Uffizi in Rome", the
+     * experience still resolves to Florence.
+     */
     const normalizedRequest: SearchRequest = {
       ...request,
       experience: experience.title,
-      city: request.city ?? experience.city,
-      requestedDate: providerAvailability.requestedDate,
+      city: experience.city,
     };
 
-    if (providerAvailability.providerError) {
+    const evaluation = this.evaluateExperience(
+      experience,
+      normalizedRequest.requestedDate,
+      normalizedRequest.requestedTicketCount,
+    );
+
+    normalizedRequest.requestedDate =
+      evaluation.requestedDate;
+
+    if (evaluation.providerError) {
       return this.createResult({
         experience,
         request: normalizedRequest,
-        state: 'provider-error',
-        requestedDateSlots: [],
-        alternateDates: [],
+        evaluation,
         errorMessage:
           'We could not retrieve live availability right now. Please try again shortly.',
       });
     }
 
-    const requestedDateSlots = this.filterBookableSlots(
-      providerAvailability.requestedDateSlots,
-      request.requestedTicketCount,
-    );
+    const shouldSuggestAlternatives =
+      evaluation.state === 'no-availability' ||
+      evaluation.state === 'group-too-large';
 
-    const alternateDates = providerAvailability.alternateDates
-      .map((availableDate) => ({
-        ...availableDate,
-        slots: this.filterBookableSlots(
-          availableDate.slots,
-          request.requestedTicketCount,
-        ),
-      }))
-      .filter((availableDate) => availableDate.slots.length > 0);
+    const suggestedExperiences =
+      shouldSuggestAlternatives
+        ? this.getSuggestedExperiences(
+            experience,
+            normalizedRequest,
+          )
+        : undefined;
 
-    const alternateDateSlots =
-      providerAvailability.alternateDates.reduce<AvailabilitySlot[]>(
+    return this.createResult({
+      experience,
+      request: normalizedRequest,
+      evaluation,
+      suggestedExperiences,
+    });
+  }
+
+  private evaluateExperience(
+    experience: Experience,
+    requestedDate: string,
+    requestedTicketCount: number,
+  ): ExperienceEvaluation {
+    const providerAvailability =
+      this.getMockProviderAvailability(
+        requestedDate,
+        experience.bookingUrl,
+        experience.id,
+      );
+
+    if (providerAvailability.providerError) {
+      return {
+        providerError: true,
+        requestedDate:
+          providerAvailability.requestedDate,
+        requestedDateSlots: [],
+        alternateDates: [],
+        largestAvailableGroupSize: 0,
+        state: 'provider-error',
+      };
+    }
+
+    const requestedDateSlots =
+      this.filterBookableSlots(
+        providerAvailability.requestedDateSlots,
+        requestedTicketCount,
+      );
+
+    const alternateDates =
+      providerAvailability.alternateDates
+        .map((availableDate) => ({
+          ...availableDate,
+          slots: this.filterBookableSlots(
+            availableDate.slots,
+            requestedTicketCount,
+          ),
+        }))
+        .filter(
+          (availableDate) =>
+            availableDate.slots.length > 0,
+        );
+
+    const allProviderSlots = [
+      ...providerAvailability.requestedDateSlots,
+      ...providerAvailability.alternateDates.reduce<
+        AvailabilitySlot[]
+      >(
         (slots, availableDate) => [
           ...slots,
           ...availableDate.slots,
         ],
         [],
-      );
-
-    const allProviderSlots = [
-      ...providerAvailability.requestedDateSlots,
-      ...alternateDateSlots,
+      ),
     ];
 
     const largestAvailableGroupSize =
-      this.getLargestAvailableGroupSize(allProviderSlots);
+      this.getLargestAvailableGroupSize(
+        allProviderSlots,
+      );
 
     const state = this.determineState({
       requestedDateSlots,
       alternateDates,
       largestAvailableGroupSize,
-      requestedTicketCount: request.requestedTicketCount,
+      requestedTicketCount,
     });
 
-    return this.createResult({
-      experience,
-      request: normalizedRequest,
-      state,
+    return {
+      providerError: false,
+      requestedDate:
+        providerAvailability.requestedDate,
       requestedDateSlots,
       alternateDates,
       largestAvailableGroupSize,
-      suggestedExperiences:
-        state === 'no-availability' ||
-        state === 'group-too-large'
-          ? this.getSuggestedExperiences(
-              experience,
-              normalizedRequest.city,
-            )
-          : undefined,
-    });
-  }
-
-  private resolveExperience(title?: string): Experience {
-    const requestedExperience = title
-      ? this.experienceCatalogService.getByTitle(title)
-      : null;
-
-    if (requestedExperience) {
-      return requestedExperience;
-    }
-
-    const defaultExperience =
-      this.experienceCatalogService.getByTitle(
-        'Vatican Museums',
-      );
-
-    if (!defaultExperience) {
-      throw new Error(
-        'Vatican Museums is missing from the experience catalog.',
-      );
-    }
-
-    return defaultExperience;
+      state,
+    };
   }
 
   private getSuggestedExperiences(
-    experience: Experience,
-    city?: string,
+    requestedExperience: Experience,
+    request: SearchRequest,
   ): SuggestedExperience[] {
-    const alternatives =
+    /*
+     * Ask for more than we intend to display because
+     * some candidates may fail the availability test.
+     */
+    const geographicCandidates =
       this.experienceCatalogService.getAlternatives(
-        experience.id,
-        city ?? experience.city,
-        3,
+        requestedExperience.id,
+        requestedExperience.city,
+        10,
       );
 
-    return alternatives.map((alternative) => ({
-      id: alternative.id,
-      title: alternative.title,
-      location: alternative.location,
-      imageUrl: alternative.imageUrl,
-    }));
+    const sameDateSuggestions: SuggestedExperience[] =
+      [];
+
+    const alternateDateSuggestions: SuggestedExperience[] =
+      [];
+
+    for (const candidate of geographicCandidates) {
+      const evaluation = this.evaluateExperience(
+        candidate,
+        request.requestedDate,
+        request.requestedTicketCount,
+      );
+
+      /*
+       * Never recommend:
+       *
+       * - provider failures
+       * - experiences that cannot fit the full group
+       * - experiences with no useful availability
+       */
+      if (
+        evaluation.providerError ||
+        (
+          evaluation.state !== 'available' &&
+          evaluation.state !== 'alternate-dates'
+        )
+      ) {
+        continue;
+      }
+
+      const suggestion: SuggestedExperience = {
+        id: candidate.id,
+        title: candidate.title,
+        city: candidate.city,
+        location: candidate.location,
+        imageUrl: candidate.imageUrl,
+
+        state: evaluation.state,
+
+        requestedDate: evaluation.requestedDate,
+        requestedDateSlots:
+          evaluation.requestedDateSlots,
+
+        alternateDates:
+          evaluation.alternateDates,
+      };
+
+      /*
+       * Requested-date availability always ranks before
+       * alternatives that require changing the date.
+       *
+       * Geographic priority is still preserved because
+       * ExperienceCatalogService already ordered the
+       * candidate list.
+       */
+      if (evaluation.state === 'available') {
+        sameDateSuggestions.push(suggestion);
+      } else {
+        alternateDateSuggestions.push(suggestion);
+      }
+    }
+
+    return [
+      ...sameDateSuggestions,
+      ...alternateDateSuggestions,
+    ].slice(0, 3);
+  }
+
+  private resolveExperience(
+    title?: string,
+  ): Experience | null {
+    if (!title?.trim()) {
+      return null;
+    }
+
+    return this.experienceCatalogService.getByTitle(
+      title,
+    );
+  }
+
+  private createUnsupportedResult(
+    request: SearchRequest,
+  ): SearchResult {
+    const requestedTitle =
+      request.experience?.trim() ||
+      'Requested experience';
+
+    return {
+      id: 'unsupported-experience',
+
+      title: requestedTitle,
+
+      city: request.city?.trim() ?? '',
+      location:
+        request.city?.trim() ??
+        'Experience not yet supported',
+
+      requestedDate: request.requestedDate,
+
+      requestedTicketCount:
+        request.requestedTicketCount,
+
+      state: 'unsupported-experience',
+
+      requestedDateSlots: [],
+      alternateDates: [],
+
+      errorMessage:
+        `We do not currently have booking information for ${requestedTitle}. Try another attraction or return to chat.`,
+    };
   }
 
   private determineState(options: {
@@ -178,7 +347,10 @@ export class SearchResultsService {
     alternateDates: AvailableDate[];
     largestAvailableGroupSize: number;
     requestedTicketCount: number;
-  }): SearchResultState {
+  }): Exclude<
+    SearchResultState,
+    'provider-error' | 'unsupported-experience'
+  > {
     const {
       requestedDateSlots,
       alternateDates,
@@ -196,7 +368,8 @@ export class SearchResultsService {
 
     if (
       largestAvailableGroupSize > 0 &&
-      largestAvailableGroupSize < requestedTicketCount
+      largestAvailableGroupSize <
+        requestedTicketCount
     ) {
       return 'group-too-large';
     }
@@ -207,31 +380,39 @@ export class SearchResultsService {
   private createResult(options: {
     experience: Experience;
     request: SearchRequest;
-    state: SearchResultState;
-    requestedDateSlots: AvailabilitySlot[];
-    alternateDates: AvailableDate[];
-    largestAvailableGroupSize?: number;
+    evaluation: ExperienceEvaluation;
     errorMessage?: string;
     suggestedExperiences?: SuggestedExperience[];
   }): SearchResult {
     return {
       id: options.experience.id,
       title: options.experience.title,
+
+      city: options.experience.city,
       location: options.experience.location,
+
       imageUrl: options.experience.imageUrl,
 
-      requestedDate: options.request.requestedDate,
+      requestedDate:
+        options.evaluation.requestedDate,
+
       requestedTicketCount:
         options.request.requestedTicketCount,
 
-      state: options.state,
+      state: options.evaluation.state,
 
-      requestedDateSlots: options.requestedDateSlots,
-      alternateDates: options.alternateDates,
+      requestedDateSlots:
+        options.evaluation.requestedDateSlots,
+
+      alternateDates:
+        options.evaluation.alternateDates,
 
       largestAvailableGroupSize:
-        options.largestAvailableGroupSize,
+        options.evaluation
+          .largestAvailableGroupSize,
+
       errorMessage: options.errorMessage,
+
       suggestedExperiences:
         options.suggestedExperiences,
     };
@@ -243,7 +424,8 @@ export class SearchResultsService {
   ): AvailabilitySlot[] {
     return slots.filter(
       (slot) =>
-        slot.availableTickets >= requestedTicketCount,
+        slot.availableTickets >=
+        requestedTicketCount,
     );
   }
 
@@ -255,7 +437,9 @@ export class SearchResultsService {
     }
 
     return Math.max(
-      ...slots.map((slot) => slot.availableTickets),
+      ...slots.map(
+        (slot) => slot.availableTickets,
+      ),
     );
   }
 
@@ -270,85 +454,60 @@ export class SearchResultsService {
     /*
      * Temporary deterministic provider-error test.
      */
-    if (normalizedDate.key === '1-january-2027') {
+    if (
+      normalizedDate.key ===
+      '1-january-2027'
+    ) {
       return {
         providerError: true,
-        requestedDate: normalizedDate.displayDate,
+
+        requestedDate:
+          normalizedDate.displayDate,
+
         requestedDateSlots: [],
         alternateDates: [],
       };
     }
 
     /*
-     * Temporary deterministic no-availability test.
+     * Temporary deterministic complete
+     * no-availability test.
      */
     if (
-      normalizedDate.key === '31-december-2026'
+      normalizedDate.key ===
+      '31-december-2026'
     ) {
       return {
         providerError: false,
-        requestedDate: normalizedDate.displayDate,
+
+        requestedDate:
+          normalizedDate.displayDate,
+
         requestedDateSlots: [],
         alternateDates: [],
       };
     }
 
-    const inventory = this.createMockInventory(
-      bookingUrl,
-      experienceId,
-    );
-
-    const requestedDateSlots =
-      inventory[normalizedDate.key] ?? [];
-
-    const alternateDates = this.getAlternateDates(
-      normalizedDate.key,
-      inventory,
-    );
+    const inventory =
+      this.createMockInventory(
+        bookingUrl,
+        experienceId,
+      );
 
     return {
       providerError: false,
-      requestedDate: normalizedDate.displayDate,
-      requestedDateSlots,
-      alternateDates,
-    };
-  }
 
-  private getFutureDate(
-    daysFromToday: number,
-  ): Date {
-    const date = new Date();
+      requestedDate:
+        normalizedDate.displayDate,
 
-    date.setHours(0, 0, 0, 0);
-    date.setDate(
-      date.getDate() + daysFromToday,
-    );
+      requestedDateSlots:
+        inventory[normalizedDate.key] ?? [],
 
-    return date;
-  }
-
-  private createDateInfo(
-    date: Date,
-  ): NormalizedDate {
-    const day = date.getDate();
-
-    const month =
-      new Intl.DateTimeFormat('en-GB', {
-        month: 'long',
-      })
-        .format(date)
-        .toLowerCase();
-
-    const year = date.getFullYear();
-
-    return {
-      key: `${day}-${month}-${year}`,
-      displayDate:
-        new Intl.DateTimeFormat('en-GB', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        }).format(date),
+      alternateDates:
+        this.getAlternateDates(
+          normalizedDate.key,
+          inventory,
+        ),
     };
   }
 
@@ -356,296 +515,472 @@ export class SearchResultsService {
     bookingUrl: string,
     experienceId: string,
   ): Record<string, AvailabilitySlot[]> {
-    const date1 = this.createDateInfo(
-      this.getFutureDate(1),
-    );
+    const template =
+      this.getMockInventoryTemplate(
+        experienceId,
+      );
 
-    const date2 = this.createDateInfo(
-      this.getFutureDate(2),
-    );
+    const inventory: Record<
+      string,
+      AvailabilitySlot[]
+    > = {};
 
-    const date3 = this.createDateInfo(
-      this.getFutureDate(3),
-    );
+    for (const day of template) {
+      const dateInfo =
+        this.createDateInfo(
+          this.getFutureDate(
+            day.daysFromToday,
+          ),
+        );
 
-    const date4 = this.createDateInfo(
-      this.getFutureDate(4),
-    );
+      inventory[dateInfo.key] =
+        day.slots.map((slot, index) =>
+          this.createSlot(
+            `${experienceId}-${dateInfo.key}-${index}`,
+            slot.time,
+            slot.availableTickets,
+            slot.pricePerPerson,
+            bookingUrl,
+          ),
+        );
+    }
 
+    return inventory;
+  }
+
+  private getMockInventoryTemplate(
+    experienceId: string,
+  ): MockDayTemplate[] {
     switch (experienceId) {
       case 'uffizi-gallery':
-        return {
-          [date1.key]: [
-            this.createSlot(
-              `${experienceId}-${date1.key}-0830`,
-              '8:30 AM',
-              4,
-              25,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date1.key}-1045`,
-              '10:45 AM',
-              7,
-              29,
-              bookingUrl,
-            ),
-          ],
-
-          [date2.key]: [
-            this.createSlot(
-              `${experienceId}-${date2.key}-0915`,
-              '9:15 AM',
-              5,
-              25,
-              bookingUrl,
-            ),
-          ],
-
-          [date3.key]: [],
-
-          [date4.key]: [
-            this.createSlot(
-              `${experienceId}-${date4.key}-1130`,
-              '11:30 AM',
-              8,
-              29,
-              bookingUrl,
-            ),
-          ],
-        };
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '8:30 AM',
+                availableTickets: 4,
+                pricePerPerson: 25,
+              },
+              {
+                time: '10:45 AM',
+                availableTickets: 7,
+                pricePerPerson: 29,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '9:15 AM',
+                availableTickets: 5,
+                pricePerPerson: 25,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '11:30 AM',
+                availableTickets: 8,
+                pricePerPerson: 29,
+              },
+            ],
+          },
+        ];
 
       case 'colosseum':
-        return {
-          [date1.key]: [
-            this.createSlot(
-              `${experienceId}-${date1.key}-0900`,
-              '9:00 AM',
-              10,
-              18,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date1.key}-1230`,
-              '12:30 PM',
-              6,
-              22,
-              bookingUrl,
-            ),
-          ],
-
-          [date2.key]: [
-            this.createSlot(
-              `${experienceId}-${date2.key}-1000`,
-              '10:00 AM',
-              12,
-              20,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date2.key}-1530`,
-              '3:30 PM',
-              4,
-              24,
-              bookingUrl,
-            ),
-          ],
-
-          [date3.key]: [
-            this.createSlot(
-              `${experienceId}-${date3.key}-1100`,
-              '11:00 AM',
-              3,
-              20,
-              bookingUrl,
-            ),
-          ],
-
-          [date4.key]: [],
-        };
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '9:00 AM',
+                availableTickets: 10,
+                pricePerPerson: 18,
+              },
+              {
+                time: '12:30 PM',
+                availableTickets: 6,
+                pricePerPerson: 22,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '10:00 AM',
+                availableTickets: 12,
+                pricePerPerson: 20,
+              },
+              {
+                time: '3:30 PM',
+                availableTickets: 4,
+                pricePerPerson: 24,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [
+              {
+                time: '11:00 AM',
+                availableTickets: 3,
+                pricePerPerson: 20,
+              },
+            ],
+          },
+          {
+            daysFromToday: 4,
+            slots: [],
+          },
+        ];
 
       case 'pompeii':
-        return {
-          [date1.key]: [
-            this.createSlot(
-              `${experienceId}-${date1.key}-0900`,
-              '9:00 AM',
-              8,
-              20,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date1.key}-1130`,
-              '11:30 AM',
-              10,
-              22,
-              bookingUrl,
-            ),
-          ],
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '9:00 AM',
+                availableTickets: 8,
+                pricePerPerson: 20,
+              },
+              {
+                time: '11:30 AM',
+                availableTickets: 10,
+                pricePerPerson: 22,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '10:00 AM',
+                availableTickets: 6,
+                pricePerPerson: 20,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '1:00 PM',
+                availableTickets: 12,
+                pricePerPerson: 24,
+              },
+            ],
+          },
+        ];
 
-          [date2.key]: [
-            this.createSlot(
-              `${experienceId}-${date2.key}-1000`,
-              '10:00 AM',
-              6,
-              20,
-              bookingUrl,
-            ),
-          ],
+      /*
+       * Campania alternatives deliberately have larger
+       * capacities so a large Pompeii group can receive
+       * genuinely useful alternatives.
+       */
+      case 'herculaneum':
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '9:30 AM',
+                availableTickets: 16,
+                pricePerPerson: 18,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '11:00 AM',
+                availableTickets: 18,
+                pricePerPerson: 20,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '2:00 PM',
+                availableTickets: 16,
+                pricePerPerson: 20,
+              },
+            ],
+          },
+        ];
 
-          [date3.key]: [],
+      case 'naples-archaeological-museum':
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '10:00 AM',
+                availableTickets: 24,
+                pricePerPerson: 18,
+              },
+              {
+                time: '1:00 PM',
+                availableTickets: 22,
+                pricePerPerson: 18,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '11:00 AM',
+                availableTickets: 24,
+                pricePerPerson: 18,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '3:00 PM',
+                availableTickets: 20,
+                pricePerPerson: 18,
+              },
+            ],
+          },
+        ];
 
-          [date4.key]: [
-            this.createSlot(
-              `${experienceId}-${date4.key}-1300`,
-              '1:00 PM',
-              12,
-              24,
-              bookingUrl,
-            ),
-          ],
-        };
+      case 'mount-vesuvius':
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '9:00 AM',
+                availableTickets: 30,
+                pricePerPerson: 15,
+              },
+              {
+                time: '12:00 PM',
+                availableTickets: 26,
+                pricePerPerson: 15,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '10:30 AM',
+                availableTickets: 28,
+                pricePerPerson: 15,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '2:30 PM',
+                availableTickets: 25,
+                pricePerPerson: 15,
+              },
+            ],
+          },
+        ];
+
+      case 'amalfi-coast':
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '8:00 AM',
+                availableTickets: 25,
+                pricePerPerson: 45,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '9:00 AM',
+                availableTickets: 28,
+                pricePerPerson: 45,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '8:30 AM',
+                availableTickets: 25,
+                pricePerPerson: 48,
+              },
+            ],
+          },
+        ];
 
       case 'accademia-gallery':
-        return {
-          [date1.key]: [
-            this.createSlot(
-              `${experienceId}-${date1.key}-0845`,
-              '8:45 AM',
-              5,
-              18,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date1.key}-1100`,
-              '11:00 AM',
-              7,
-              22,
-              bookingUrl,
-            ),
-          ],
-
-          [date2.key]: [
-            this.createSlot(
-              `${experienceId}-${date2.key}-0930`,
-              '9:30 AM',
-              6,
-              20,
-              bookingUrl,
-            ),
-          ],
-
-          [date3.key]: [],
-
-          [date4.key]: [
-            this.createSlot(
-              `${experienceId}-${date4.key}-1430`,
-              '2:30 PM',
-              8,
-              22,
-              bookingUrl,
-            ),
-          ],
-        };
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '8:45 AM',
+                availableTickets: 5,
+                pricePerPerson: 18,
+              },
+              {
+                time: '11:00 AM',
+                availableTickets: 7,
+                pricePerPerson: 22,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '9:30 AM',
+                availableTickets: 6,
+                pricePerPerson: 20,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '2:30 PM',
+                availableTickets: 8,
+                pricePerPerson: 22,
+              },
+            ],
+          },
+        ];
 
       case 'borghese-gallery':
-        return {
-          [date1.key]: [
-            this.createSlot(
-              `${experienceId}-${date1.key}-0900`,
-              '9:00 AM',
-              4,
-              17,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date1.key}-1300`,
-              '1:00 PM',
-              6,
-              20,
-              bookingUrl,
-            ),
-          ],
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '9:00 AM',
+                availableTickets: 4,
+                pricePerPerson: 17,
+              },
+              {
+                time: '1:00 PM',
+                availableTickets: 6,
+                pricePerPerson: 20,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '11:00 AM',
+                availableTickets: 5,
+                pricePerPerson: 19,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '3:00 PM',
+                availableTickets: 8,
+                pricePerPerson: 21,
+              },
+            ],
+          },
+        ];
 
-          [date2.key]: [
-            this.createSlot(
-              `${experienceId}-${date2.key}-1100`,
-              '11:00 AM',
-              5,
-              19,
-              bookingUrl,
-            ),
-          ],
-
-          [date3.key]: [],
-
-          [date4.key]: [
-            this.createSlot(
-              `${experienceId}-${date4.key}-1500`,
-              '3:00 PM',
-              8,
-              21,
-              bookingUrl,
-            ),
-          ],
-        };
-
-      case 'vatican-museums':
       default:
-        return {
-          [date1.key]: [
-            this.createSlot(
-              `${experienceId}-${date1.key}-0900`,
-              '9:00 AM',
-              2,
-              18,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date1.key}-1100`,
-              '11:00 AM',
-              5,
-              20,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date1.key}-1400`,
-              '2:00 PM',
-              8,
-              24,
-              bookingUrl,
-            ),
-          ],
-
-          [date2.key]: [
-            this.createSlot(
-              `${experienceId}-${date2.key}-0900`,
-              '9:00 AM',
-              6,
-              20,
-              bookingUrl,
-            ),
-            this.createSlot(
-              `${experienceId}-${date2.key}-1300`,
-              '1:00 PM',
-              10,
-              22,
-              bookingUrl,
-            ),
-          ],
-
-          [date3.key]: [],
-
-          [date4.key]: [
-            this.createSlot(
-              `${experienceId}-${date4.key}-1200`,
-              '12:00 PM',
-              9,
-              24,
-              bookingUrl,
-            ),
-          ],
-        };
+        return [
+          {
+            daysFromToday: 1,
+            slots: [
+              {
+                time: '9:00 AM',
+                availableTickets: 5,
+                pricePerPerson: 20,
+              },
+              {
+                time: '11:00 AM',
+                availableTickets: 8,
+                pricePerPerson: 24,
+              },
+            ],
+          },
+          {
+            daysFromToday: 2,
+            slots: [
+              {
+                time: '10:00 AM',
+                availableTickets: 10,
+                pricePerPerson: 22,
+              },
+            ],
+          },
+          {
+            daysFromToday: 3,
+            slots: [],
+          },
+          {
+            daysFromToday: 4,
+            slots: [
+              {
+                time: '12:00 PM',
+                availableTickets: 9,
+                pricePerPerson: 24,
+              },
+            ],
+          },
+        ];
     }
   }
 
@@ -682,6 +1017,49 @@ export class SearchResultsService {
     } ${year}`;
   }
 
+  private getFutureDate(
+    daysFromToday: number,
+  ): Date {
+    const date = new Date();
+
+    date.setHours(0, 0, 0, 0);
+
+    date.setDate(
+      date.getDate() + daysFromToday,
+    );
+
+    return date;
+  }
+
+  private createDateInfo(
+    date: Date,
+  ): NormalizedDate {
+    const day = date.getDate();
+
+    const month =
+      new Intl.DateTimeFormat('en-GB', {
+        month: 'long',
+      })
+        .format(date)
+        .toLowerCase();
+
+    const year = date.getFullYear();
+
+    return {
+      key: `${day}-${month}-${year}`,
+
+      displayDate:
+        new Intl.DateTimeFormat(
+          'en-GB',
+          {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          },
+        ).format(date),
+    };
+  }
+
   private normalizeDate(
     value: string,
   ): NormalizedDate {
@@ -697,7 +1075,9 @@ export class SearchResultsService {
       );
     }
 
-    if (normalizedValue === 'tomorrow') {
+    if (
+      normalizedValue === 'tomorrow'
+    ) {
       return this.createDateInfo(
         this.getFutureDate(1),
       );
@@ -749,15 +1129,21 @@ export class SearchResultsService {
     if (dayMonthMatch) {
       day = dayMonthMatch[1];
       monthInput = dayMonthMatch[2];
+
       year =
         dayMonthMatch[3] ??
-        String(new Date().getFullYear());
+        String(
+          new Date().getFullYear(),
+        );
     } else if (monthDayMatch) {
       monthInput = monthDayMatch[1];
       day = monthDayMatch[2];
+
       year =
         monthDayMatch[3] ??
-        String(new Date().getFullYear());
+        String(
+          new Date().getFullYear(),
+        );
     } else {
       return {
         key:
@@ -765,6 +1151,7 @@ export class SearchResultsService {
             /\s+/g,
             '-',
           ),
+
         displayDate: value,
       };
     }
@@ -779,13 +1166,13 @@ export class SearchResultsService {
             /\s+/g,
             '-',
           ),
+
         displayDate: value,
       };
     }
 
-    const normalizedDay = String(
-      Number(day),
-    );
+    const normalizedDay =
+      String(Number(day));
 
     const capitalizedMonth =
       month.charAt(0).toUpperCase() +
@@ -794,6 +1181,7 @@ export class SearchResultsService {
     return {
       key:
         `${normalizedDay}-${month}-${year}`,
+
       displayDate:
         `${normalizedDay} ${capitalizedMonth} ${year}`,
     };

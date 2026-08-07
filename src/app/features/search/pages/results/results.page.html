@@ -1,60 +1,99 @@
-<ion-content [fullscreen]="true" class="results-page">
+<ion-content
+  [fullscreen]="true"
+  class="results-page"
+>
   <main class="results-container">
-    <section class="hero">
-      <img
-        [src]="result.imageUrl"
-        [alt]="result.title"
-        class="hero-image"
-      />
+    <section
+      class="hero"
+      [class.hero--without-image]="!result.imageUrl"
+    >
+      @if (result.imageUrl) {
+        <img
+          [src]="result.imageUrl"
+          [alt]="result.title"
+          class="hero-image"
+        />
+      }
 
       <div class="hero-overlay"></div>
 
       <div class="hero-content">
-        <p class="hero-location">{{ result.location }}</p>
-        <h1>{{ result.title }}</h1>
+        <p class="hero-location">
+          {{ result.location }}
+        </p>
+
+        <h1>
+          {{ result.title }}
+        </h1>
       </div>
     </section>
 
     <section class="request-summary">
       <div>
-        <p class="summary-label">Your request</p>
+        <p class="summary-label">
+          Your request
+        </p>
 
-        <h2>{{ result.requestedDate }}</h2>
+        <h2>
+          {{ result.requestedDate }}
+        </h2>
 
         <p class="request-detail">
           {{ result.requestedTicketCount }}
-          {{ result.requestedTicketCount === 1 ? 'traveller' : 'travellers' }}
+          {{
+            result.requestedTicketCount === 1
+              ? 'traveller'
+              : 'travellers'
+          }}
         </p>
       </div>
 
       @switch (result.state) {
         @case ('available') {
-          <span class="state-badge state-badge--available">
+          <span
+            class="state-badge state-badge--available"
+          >
             Available
           </span>
         }
 
         @case ('alternate-dates') {
-          <span class="state-badge state-badge--warning">
+          <span
+            class="state-badge state-badge--warning"
+          >
             Other dates available
           </span>
         }
 
         @case ('no-availability') {
-          <span class="state-badge state-badge--unavailable">
+          <span
+            class="state-badge state-badge--unavailable"
+          >
             Unavailable
           </span>
         }
 
         @case ('group-too-large') {
-          <span class="state-badge state-badge--warning">
+          <span
+            class="state-badge state-badge--warning"
+          >
             Group size unavailable
           </span>
         }
 
         @case ('provider-error') {
-          <span class="state-badge state-badge--error">
+          <span
+            class="state-badge state-badge--error"
+          >
             Search interrupted
+          </span>
+        }
+
+        @case ('unsupported-experience') {
+          <span
+            class="state-badge state-badge--error"
+          >
+            Not supported yet
           </span>
         }
       }
@@ -64,25 +103,40 @@
       @case ('available') {
         <section class="result-section">
           <div class="section-heading">
-            <p class="section-kicker">Choose a date</p>
-            <h2>{{ selectedDate }}</h2>
+            <p class="section-kicker">
+              Choose a date
+            </p>
+
+            <h2>
+              {{ selectedDate }}
+            </h2>
           </div>
 
-          <div class="date-chips" aria-label="Available dates">
+          <div
+            class="date-chips"
+            aria-label="Available dates"
+          >
             <button
               type="button"
               class="date-chip"
-              [class.date-chip--active]="isRequestedDateSelected"
+              [class.date-chip--active]="
+                isRequestedDateSelected
+              "
               (click)="selectRequestedDate()"
             >
               {{ result.requestedDate }}
             </button>
 
-            @for (date of result.alternateDates; track date.date) {
+            @for (
+              date of result.alternateDates;
+              track date.date
+            ) {
               <button
                 type="button"
                 class="date-chip"
-                [class.date-chip--active]="selectedDate === date.date"
+                [class.date-chip--active]="
+                  selectedDate === date.date
+                "
                 (click)="selectAlternateDate(date)"
               >
                 {{ date.date }}
@@ -90,33 +144,54 @@
             }
           </div>
 
-          <div class="section-heading section-heading--slots">
-            <p class="section-kicker">Available times</p>
+          <div
+            class="
+              section-heading
+              section-heading--slots
+            "
+          >
+            <p class="section-kicker">
+              Available times
+            </p>
 
             <h2>
               {{ selectedSlots.length }}
-              {{ selectedSlots.length === 1 ? 'slot' : 'slots' }}
+              {{
+                selectedSlots.length === 1
+                  ? 'slot'
+                  : 'slots'
+              }}
             </h2>
           </div>
 
           <div class="slot-list">
-            @for (slot of selectedSlots; track slot.id) {
+            @for (
+              slot of selectedSlots;
+              track slot.id
+            ) {
               <article class="slot-card">
                 <div class="slot-details">
-                  <h3>{{ slot.time }}</h3>
+                  <h3>
+                    {{ slot.time }}
+                  </h3>
 
                   <p>
-                    {{ slot.availableTickets }} tickets available
+                    {{ slot.availableTickets }}
+                    tickets available
                   </p>
 
                   <p class="slot-price">
-                    €{{ slot.pricePerPerson }} per person
+                    €{{ slot.pricePerPerson }}
+                    per person
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  class="primary-button slot-button"
+                  class="
+                    primary-button
+                    slot-button
+                  "
                   (click)="continueBooking(slot)"
                 >
                   Continue Booking
@@ -129,14 +204,26 @@
 
       @case ('alternate-dates') {
         <section class="result-section">
-          <article class="message-card message-card--warning">
-            <p class="section-kicker">Requested date unavailable</p>
+          <article
+            class="
+              message-card
+              message-card--warning
+            "
+          >
+            <p class="section-kicker">
+              Requested date unavailable
+            </p>
 
-            <h2>No suitable slot for your full group</h2>
+            <h2>
+              No suitable slot for your full group
+            </h2>
 
             <p>
-              We could not find a time on {{ result.requestedDate }} that can
-              accommodate all {{ result.requestedTicketCount }} travellers.
+              We could not find a time on
+              {{ result.requestedDate }}
+              that can accommodate all
+              {{ result.requestedTicketCount }}
+              travellers.
             </p>
 
             <button
@@ -149,16 +236,29 @@
           </article>
 
           <div class="section-heading">
-            <p class="section-kicker">Nearby availability</p>
-            <h2>Choose another date</h2>
+            <p class="section-kicker">
+              Nearby availability
+            </p>
+
+            <h2>
+              Choose another date
+            </h2>
           </div>
 
-          <div class="date-chips" aria-label="Alternative available dates">
-            @for (date of result.alternateDates; track date.date) {
+          <div
+            class="date-chips"
+            aria-label="Alternative available dates"
+          >
+            @for (
+              date of result.alternateDates;
+              track date.date
+            ) {
               <button
                 type="button"
                 class="date-chip"
-                [class.date-chip--active]="selectedDate === date.date"
+                [class.date-chip--active]="
+                  selectedDate === date.date
+                "
                 (click)="selectAlternateDate(date)"
               >
                 {{ date.date }}
@@ -167,33 +267,54 @@
           </div>
 
           @if (selectedSlots.length > 0) {
-            <div class="section-heading section-heading--slots">
-              <p class="section-kicker">Available times</p>
+            <div
+              class="
+                section-heading
+                section-heading--slots
+              "
+            >
+              <p class="section-kicker">
+                Available times
+              </p>
 
               <h2>
                 {{ selectedSlots.length }}
-                {{ selectedSlots.length === 1 ? 'slot' : 'slots' }}
+                {{
+                  selectedSlots.length === 1
+                    ? 'slot'
+                    : 'slots'
+                }}
               </h2>
             </div>
 
             <div class="slot-list">
-              @for (slot of selectedSlots; track slot.id) {
+              @for (
+                slot of selectedSlots;
+                track slot.id
+              ) {
                 <article class="slot-card">
                   <div class="slot-details">
-                    <h3>{{ slot.time }}</h3>
+                    <h3>
+                      {{ slot.time }}
+                    </h3>
 
                     <p>
-                      {{ slot.availableTickets }} tickets available
+                      {{ slot.availableTickets }}
+                      tickets available
                     </p>
 
                     <p class="slot-price">
-                      €{{ slot.pricePerPerson }} per person
+                      €{{ slot.pricePerPerson }}
+                      per person
                     </p>
                   </div>
 
                   <button
                     type="button"
-                    class="primary-button slot-button"
+                    class="
+                      primary-button
+                      slot-button
+                    "
                     (click)="continueBooking(slot)"
                   >
                     Continue Booking
@@ -201,45 +322,72 @@
                 </article>
               }
             </div>
-          } @else {
-            <article class="selection-hint">
-              <p>Select an available date to view its time slots.</p>
-            </article>
           }
         </section>
       }
 
       @case ('no-availability') {
         <section class="result-section">
-          <article class="message-card message-card--unavailable">
-            <p class="section-kicker">No current availability</p>
-
-            <h2>We could not find a bookable date</h2>
-
-            <p>
-              There are currently no suitable slots for
-              {{ result.requestedTicketCount }} travellers on the requested date
-              or nearby dates.
+          <article
+            class="
+              message-card
+              message-card--unavailable
+            "
+          >
+            <p class="section-kicker">
+              No current availability
             </p>
 
-            <button
-              type="button"
-              class="primary-button"
-              (click)="notifyMe()"
-            >
-              Notify me
-            </button>
+            <h2>
+              We could not find a bookable date
+            </h2>
+
+            <p>
+              There are currently no suitable slots
+              for {{ result.requestedTicketCount }}
+              travellers on the requested date or
+              nearby dates.
+            </p>
+
+            <div class="message-actions">
+              <button
+                type="button"
+                class="primary-button"
+                (click)="notifyMe()"
+              >
+                Notify me
+              </button>
+
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="goBackToChat()"
+              >
+                Back to chat
+              </button>
+            </div>
           </article>
 
           @if (hasSuggestedExperiences) {
-            <div class="section-heading alternatives-heading">
-              <p class="section-kicker">Other possibilities</p>
-              <h2>You may also like</h2>
+            <div
+              class="
+                section-heading
+                alternatives-heading
+              "
+            >
+              <p class="section-kicker">
+                Bookable alternatives
+              </p>
+
+              <h2>
+                Options that fit your full group
+              </h2>
             </div>
 
             <div class="experience-list">
               @for (
-                experience of result.suggestedExperiences ?? [];
+                experience of
+                  result.suggestedExperiences ?? [];
                 track experience.id
               ) {
                 <article class="experience-card">
@@ -250,76 +398,233 @@
                   />
 
                   <div class="experience-content">
-                    <h3>{{ experience.title }}</h3>
-                    <p>{{ experience.location }}</p>
+                    <div class="experience-heading">
+                      <div>
+                        <h3>
+                          {{ experience.title }}
+                        </h3>
+
+                        <p>
+                          {{ experience.location }}
+                        </p>
+                      </div>
+
+                      @if (
+                        experience.state ===
+                        'available'
+                      ) {
+                        <span
+                          class="
+                            alternative-status
+                            alternative-status--available
+                          "
+                        >
+                          Same date
+                        </span>
+                      } @else {
+                        <span
+                          class="
+                            alternative-status
+                            alternative-status--nearby
+                          "
+                        >
+                          Nearby date
+                        </span>
+                      }
+                    </div>
+
+                    @if (
+                      experience.state ===
+                      'available'
+                    ) {
+                      <p
+                        class="
+                          alternative-description
+                        "
+                      >
+                        Available for all
+                        {{ result.requestedTicketCount }}
+                        travellers on
+                        {{ result.requestedDate }}.
+                      </p>
+
+                      <div
+                        class="
+                          alternative-slot-list
+                        "
+                      >
+                        @for (
+                          slot of
+                            experience
+                              .requestedDateSlots;
+                          track slot.id
+                        ) {
+                          <div
+                            class="alternative-slot"
+                          >
+                            <div
+                              class="
+                                alternative-slot-details
+                              "
+                            >
+                              <strong>
+                                {{ slot.time }}
+                              </strong>
+
+                              <span>
+                                €{{
+                                  slot.pricePerPerson
+                                }}
+                                per person
+                              </span>
+
+                              <small>
+                                {{
+                                  slot.availableTickets
+                                }}
+                                tickets available
+                              </small>
+                            </div>
+
+                            <button
+                              type="button"
+                              class="
+                                primary-button
+                                alternative-book-button
+                              "
+                              (click)="
+                                continueBooking(slot)
+                              "
+                            >
+                              Continue Booking
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p
+                        class="
+                          alternative-description
+                        "
+                      >
+                        Your full group can be
+                        accommodated on
+                        {{
+                          experience
+                            .alternateDates[0]
+                            ?.date
+                        }}.
+                      </p>
+
+                      <button
+                        type="button"
+                        class="
+                          secondary-button
+                          alternative-view-button
+                        "
+                        (click)="
+                          selectSuggestedExperience(
+                            experience
+                          )
+                        "
+                      >
+                        View availability
+                      </button>
+                    }
                   </div>
                 </article>
               }
             </div>
+          } @else {
+            <article class="no-alternative-card">
+              <p>
+                We could not find another nearby
+                experience that can accommodate your
+                full group right now.
+              </p>
+            </article>
           }
         </section>
       }
 
       @case ('group-too-large') {
         <section class="result-section">
-          <article class="message-card message-card--warning">
-            <p class="section-kicker">Group size unavailable</p>
+          <article
+            class="
+              message-card
+              message-card--warning
+            "
+          >
+            <p class="section-kicker">
+              Group size unavailable
+            </p>
 
-            <h2>No single slot can fit your full group</h2>
+            <h2>
+              No single slot can fit your full group
+            </h2>
 
             <p>
               You requested availability for
-              {{ result.requestedTicketCount }} travellers.
+              {{ result.requestedTicketCount }}
+              travellers.
             </p>
 
-            @if (result.largestAvailableGroupSize) {
+            @if (
+              result.largestAvailableGroupSize
+            ) {
               <div class="capacity-summary">
-                <span>Largest group currently supported</span>
+                <span>
+                  Largest group currently supported
+                </span>
 
                 <strong>
-                  {{ result.largestAvailableGroupSize }} travellers
+                  {{
+                    result.largestAvailableGroupSize
+                  }}
+                  travellers
                 </strong>
               </div>
             }
 
-            <button
-              type="button"
-              class="primary-button"
-              (click)="notifyMe()"
-            >
-              Notify me
-            </button>
+            <div class="message-actions">
+              <button
+                type="button"
+                class="primary-button"
+                (click)="notifyMe()"
+              >
+                Notify me
+              </button>
+
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="goBackToChat()"
+              >
+                Change search
+              </button>
+            </div>
           </article>
 
-          @if (hasAlternateDates) {
-            <div class="section-heading">
-              <p class="section-kicker">Other dates</p>
-              <h2>Check nearby availability</h2>
-            </div>
-
-            <div class="date-chips">
-              @for (date of result.alternateDates; track date.date) {
-                <button
-                  type="button"
-                  class="date-chip"
-                  [class.date-chip--active]="selectedDate === date.date"
-                  (click)="selectAlternateDate(date)"
-                >
-                  {{ date.date }}
-                </button>
-              }
-            </div>
-          }
-
           @if (hasSuggestedExperiences) {
-            <div class="section-heading alternatives-heading">
-              <p class="section-kicker">Other possibilities</p>
-              <h2>Experiences that may fit your group</h2>
+            <div
+              class="
+                section-heading
+                alternatives-heading
+              "
+            >
+              <p class="section-kicker">
+                Bookable alternatives
+              </p>
+
+              <h2>
+                Options that fit your full group
+              </h2>
             </div>
 
             <div class="experience-list">
               @for (
-                experience of result.suggestedExperiences ?? [];
+                experience of
+                  result.suggestedExperiences ?? [];
                 track experience.id
               ) {
                 <article class="experience-card">
@@ -330,24 +635,178 @@
                   />
 
                   <div class="experience-content">
-                    <h3>{{ experience.title }}</h3>
-                    <p>{{ experience.location }}</p>
+                    <div class="experience-heading">
+                      <div>
+                        <h3>
+                          {{ experience.title }}
+                        </h3>
+
+                        <p>
+                          {{ experience.location }}
+                        </p>
+                      </div>
+
+                      @if (
+                        experience.state ===
+                        'available'
+                      ) {
+                        <span
+                          class="
+                            alternative-status
+                            alternative-status--available
+                          "
+                        >
+                          Same date
+                        </span>
+                      } @else {
+                        <span
+                          class="
+                            alternative-status
+                            alternative-status--nearby
+                          "
+                        >
+                          Nearby date
+                        </span>
+                      }
+                    </div>
+
+                    @if (
+                      experience.state ===
+                      'available'
+                    ) {
+                      <p
+                        class="
+                          alternative-description
+                        "
+                      >
+                        Available for all
+                        {{ result.requestedTicketCount }}
+                        travellers on
+                        {{ result.requestedDate }}.
+                      </p>
+
+                      <div
+                        class="
+                          alternative-slot-list
+                        "
+                      >
+                        @for (
+                          slot of
+                            experience
+                              .requestedDateSlots;
+                          track slot.id
+                        ) {
+                          <div
+                            class="alternative-slot"
+                          >
+                            <div
+                              class="
+                                alternative-slot-details
+                              "
+                            >
+                              <strong>
+                                {{ slot.time }}
+                              </strong>
+
+                              <span>
+                                €{{
+                                  slot.pricePerPerson
+                                }}
+                                per person
+                              </span>
+
+                              <small>
+                                {{
+                                  slot.availableTickets
+                                }}
+                                tickets available
+                              </small>
+                            </div>
+
+                            <button
+                              type="button"
+                              class="
+                                primary-button
+                                alternative-book-button
+                              "
+                              (click)="
+                                continueBooking(slot)
+                              "
+                            >
+                              Continue Booking
+                            </button>
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p
+                        class="
+                          alternative-description
+                        "
+                      >
+                        Your full group can be
+                        accommodated on
+                        {{
+                          experience
+                            .alternateDates[0]
+                            ?.date
+                        }}.
+                      </p>
+
+                      <button
+                        type="button"
+                        class="
+                          secondary-button
+                          alternative-view-button
+                        "
+                        (click)="
+                          selectSuggestedExperience(
+                            experience
+                          )
+                        "
+                      >
+                        View availability
+                      </button>
+                    }
                   </div>
                 </article>
               }
             </div>
+          } @else {
+            <article class="no-alternative-card">
+              <p>
+                We could not find another nearby
+                experience that can accommodate all
+                {{ result.requestedTicketCount }}
+                travellers right now.
+              </p>
+            </article>
           }
         </section>
       }
 
       @case ('provider-error') {
         <section class="result-section">
-          <article class="message-card message-card--error">
-            <div class="error-icon" aria-hidden="true">!</div>
+          <article
+            class="
+              message-card
+              message-card--error
+            "
+          >
+            <div
+              class="error-icon"
+              aria-hidden="true"
+            >
+              !
+            </div>
 
-            <p class="section-kicker">Availability unavailable</p>
+            <p class="section-kicker">
+              Availability unavailable
+            </p>
 
-            <h2>We could not complete the search</h2>
+            <h2>
+              We could not complete the search
+            </h2>
 
             <p>
               {{
@@ -373,6 +832,48 @@
                 Back to chat
               </button>
             </div>
+          </article>
+        </section>
+      }
+
+      @case ('unsupported-experience') {
+        <section class="result-section">
+          <article
+            class="
+              message-card
+              message-card--error
+            "
+          >
+            <div
+              class="error-icon"
+              aria-hidden="true"
+            >
+              ?
+            </div>
+
+            <p class="section-kicker">
+              Experience not supported
+            </p>
+
+            <h2>
+              We do not have booking information for
+              this experience yet
+            </h2>
+
+            <p>
+              {{
+                result.errorMessage ??
+                  'Try another attraction or return to chat.'
+              }}
+            </p>
+
+            <button
+              type="button"
+              class="primary-button"
+              (click)="goBackToChat()"
+            >
+              Back to chat
+            </button>
           </article>
         </section>
       }
