@@ -1,15 +1,40 @@
-import { Component } from '@angular/core';
-import { Router } from '@angular/router';
-import { IonContent } from '@ionic/angular/standalone';
+import {
+  Component,
+} from '@angular/core';
+import {
+  Router,
+} from '@angular/router';
+import {
+  IonContent,
+} from '@ionic/angular/standalone';
 
-import { SearchRequest } from '../../../../core/services/chat-api.service';
+import {
+  AuthService,
+} from '../../../../core/services/auth.service';
+import {
+  NotificationWatchService,
+  PushPermissionStatus,
+} from '../../../../core/services/notification-watch.service';
+import {
+  SearchRequest,
+} from '../../../../core/services/chat-api.service';
 import {
   AvailabilitySlot,
   AvailableDate,
   SearchResult,
   SuggestedExperience,
 } from '../../models/search-result.model';
-import { SearchResultsService } from '../../services/search-results.service';
+import {
+  SearchResultsService,
+} from '../../services/search-results.service';
+
+type NotifySetupState =
+  | 'auth'
+  | 'permission'
+  | 'denied'
+  | 'unsupported'
+  | 'active'
+  | null;
 
 @Component({
   selector: 'app-results',
@@ -22,23 +47,115 @@ export class ResultsPage {
   private readonly searchStorageKey =
     'trovato-active-search';
 
+  readonly fallbackImageUrl =
+    'data:image/svg+xml;charset=UTF-8,' +
+    encodeURIComponent(`
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="1200"
+        height="800"
+        viewBox="0 0 1200 800"
+      >
+        <defs>
+          <linearGradient
+            id="background"
+            x1="0"
+            y1="0"
+            x2="1"
+            y2="1"
+          >
+            <stop
+              offset="0%"
+              stop-color="#13203a"
+            />
+            <stop
+              offset="100%"
+              stop-color="#07101f"
+            />
+          </linearGradient>
+        </defs>
+
+        <rect
+          width="1200"
+          height="800"
+          fill="url(#background)"
+        />
+
+        <circle
+          cx="930"
+          cy="160"
+          r="220"
+          fill="#4f7cff"
+          opacity="0.18"
+        />
+
+        <text
+          x="600"
+          y="390"
+          fill="#ffffff"
+          font-family="Arial, sans-serif"
+          font-size="56"
+          font-weight="700"
+          text-anchor="middle"
+        >
+          Trovato AI
+        </text>
+
+        <text
+          x="600"
+          y="455"
+          fill="#aab9d4"
+          font-family="Arial, sans-serif"
+          font-size="30"
+          text-anchor="middle"
+        >
+          Experience image unavailable
+        </text>
+      </svg>
+    `);
+
   result: SearchResult;
 
   selectedDate: string;
   selectedSlots: AvailabilitySlot[];
 
+  openingSlotId:
+    string | null = null;
+
+  isChangingExperience = false;
+
+  notifySetupState:
+    NotifySetupState = null;
+
+  isRequestingPushPermission =
+    false;
+
+  hasActiveNotification =
+    false;
+
   constructor(
     private readonly searchResultsService:
       SearchResultsService,
-    private readonly router: Router,
+
+    private readonly router:
+      Router,
+
+    private readonly authService:
+      AuthService,
+
+    private readonly notificationWatchService:
+      NotificationWatchService,
   ) {
     const navigation =
-      this.router.getCurrentNavigation();
+      this.router
+        .getCurrentNavigation();
 
     const navigationSearch =
       navigation?.extras.state?.[
         'search'
-      ] as SearchRequest | undefined;
+      ] as
+        | SearchRequest
+        | undefined;
 
     const search =
       navigationSearch ??
@@ -49,39 +166,47 @@ export class ResultsPage {
     }
 
     this.result =
-      this.searchResultsService.search(
-        search
-          ? {
-              experience:
-                search.experience,
+      this.searchResultsService
+        .search(
+          search
+            ? {
+                experience:
+                  search.experience,
 
-              city:
-                search.city,
+                city:
+                  search.city,
 
-              requestedDate:
-                search.date,
+                requestedDate:
+                  search.date,
 
-              requestedTicketCount:
-                search.travellers,
-            }
-          : undefined,
-      );
+                requestedTicketCount:
+                  search.travellers,
+              }
+            : undefined,
+        );
 
     this.selectedDate =
       this.result.requestedDate;
 
     this.selectedSlots =
-      this.result.requestedDateSlots;
+      this.result
+        .requestedDateSlots;
+
+    this.syncNotificationState();
   }
 
-  get hasAlternateDates(): boolean {
-    return this.result.alternateDates.some(
-      (date) =>
-        date.slots.length > 0,
-    );
+  get hasAlternateDates():
+    boolean {
+    return this.result
+      .alternateDates
+      .some(
+        (date) =>
+          date.slots.length > 0,
+      );
   }
 
-  get hasSuggestedExperiences(): boolean {
+  get hasSuggestedExperiences():
+    boolean {
     return (
       this.result
         .suggestedExperiences
@@ -89,11 +214,19 @@ export class ResultsPage {
     ) > 0;
   }
 
-  get isRequestedDateSelected(): boolean {
+  get isRequestedDateSelected():
+    boolean {
     return (
       this.selectedDate ===
       this.result.requestedDate
     );
+  }
+
+  get notificationButtonLabel():
+    string {
+    return this.hasActiveNotification
+      ? 'Notification active'
+      : 'Notify me';
   }
 
   selectRequestedDate(): void {
@@ -101,20 +234,35 @@ export class ResultsPage {
       this.result.requestedDate;
 
     this.selectedSlots =
-      this.result.requestedDateSlots;
+      this.result
+        .requestedDateSlots;
   }
 
   selectAlternateDate(
     date: AvailableDate,
   ): void {
-    this.selectedDate = date.date;
-    this.selectedSlots = date.slots;
+    this.selectedDate =
+      date.date;
+
+    this.selectedSlots =
+      date.slots;
   }
 
   selectSuggestedExperience(
-    experience: SuggestedExperience,
+    experience:
+      SuggestedExperience,
   ): void {
-    const nextSearch: SearchRequest = {
+    if (
+      this.isChangingExperience
+    ) {
+      return;
+    }
+
+    this.isChangingExperience =
+      true;
+
+    const nextSearch:
+      SearchRequest = {
       experience:
         experience.title,
 
@@ -122,39 +270,46 @@ export class ResultsPage {
         experience.city,
 
       date:
-        this.result.requestedDate,
+        this.result
+          .requestedDate,
 
       travellers:
         this.result
           .requestedTicketCount,
     };
 
-    this.storeSearch(nextSearch);
+    this.storeSearch(
+      nextSearch,
+    );
 
     const nextResult =
-      this.searchResultsService.search({
-        experience:
-          nextSearch.experience,
+      this.searchResultsService
+        .search({
+          experience:
+            nextSearch.experience,
 
-        city:
-          nextSearch.city,
+          city:
+            nextSearch.city,
 
-        requestedDate:
-          nextSearch.date,
+          requestedDate:
+            nextSearch.date,
 
-        requestedTicketCount:
-          nextSearch.travellers,
-      });
+          requestedTicketCount:
+            nextSearch.travellers,
+        });
 
     this.result = nextResult;
 
     if (
       nextResult.state ===
         'alternate-dates' &&
-      nextResult.alternateDates.length > 0
+      nextResult
+        .alternateDates
+        .length > 0
     ) {
       const firstAvailableDate =
-        nextResult.alternateDates[0];
+        nextResult
+          .alternateDates[0];
 
       this.selectedDate =
         firstAvailableDate.date;
@@ -166,8 +321,17 @@ export class ResultsPage {
         nextResult.requestedDate;
 
       this.selectedSlots =
-        nextResult.requestedDateSlots;
+        nextResult
+          .requestedDateSlots;
     }
+
+    this.isChangingExperience =
+      false;
+
+    this.notifySetupState =
+      null;
+
+    this.syncNotificationState();
 
     window.scrollTo({
       top: 0,
@@ -178,28 +342,84 @@ export class ResultsPage {
   continueBooking(
     slot: AvailabilitySlot,
   ): void {
+    if (this.openingSlotId) {
+      return;
+    }
+
+    this.openingSlotId =
+      slot.id;
+
     window.open(
       slot.bookingUrl,
       '_blank',
       'noopener,noreferrer',
     );
+
+    window.setTimeout(() => {
+      this.openingSlotId =
+        null;
+    }, 900);
   }
 
   notifyMe(): void {
-    console.log(
-      'Notification requested',
-      {
-        experienceId:
-          this.result.id,
+    if (
+      this.hasActiveNotification
+    ) {
+      this.notifySetupState =
+        'active';
 
-        date:
-          this.result.requestedDate,
+      return;
+    }
 
-        ticketCount:
-          this.result
-            .requestedTicketCount,
-      },
-    );
+    if (
+      !this.authService
+        .isAuthenticated()
+    ) {
+      this.notifySetupState =
+        'auth';
+
+      return;
+    }
+
+    this.continueNotifySetup();
+  }
+
+  signInAndContinue():
+    void {
+    this.authService.signIn();
+
+    this.continueNotifySetup();
+  }
+
+  async enablePushNotifications():
+    Promise<void> {
+    if (
+      this.isRequestingPushPermission
+    ) {
+      return;
+    }
+
+    this.isRequestingPushPermission =
+      true;
+
+    try {
+      const permission =
+        await this
+          .notificationWatchService
+          .requestPushPermission();
+
+      this.handlePushPermission(
+        permission,
+      );
+    } finally {
+      this.isRequestingPushPermission =
+        false;
+    }
+  }
+
+  closeNotifySetup(): void {
+    this.notifySetupState =
+      null;
   }
 
   retryAvailability(): void {
@@ -211,7 +431,8 @@ export class ResultsPage {
       return;
     }
 
-    const search: SearchRequest = {
+    const search:
+      SearchRequest = {
       experience:
         this.result.title,
 
@@ -219,7 +440,8 @@ export class ResultsPage {
         this.result.city,
 
       date:
-        this.result.requestedDate,
+        this.result
+          .requestedDate,
 
       travellers:
         this.result
@@ -229,19 +451,20 @@ export class ResultsPage {
     this.storeSearch(search);
 
     const nextResult =
-      this.searchResultsService.search({
-        experience:
-          search.experience,
+      this.searchResultsService
+        .search({
+          experience:
+            search.experience,
 
-        city:
-          search.city,
+          city:
+            search.city,
 
-        requestedDate:
-          search.date,
+          requestedDate:
+            search.date,
 
-        requestedTicketCount:
-          search.travellers,
-      });
+          requestedTicketCount:
+            search.travellers,
+        });
 
     this.result = nextResult;
 
@@ -249,13 +472,138 @@ export class ResultsPage {
       nextResult.requestedDate;
 
     this.selectedSlots =
-      nextResult.requestedDateSlots;
+      nextResult
+        .requestedDateSlots;
+
+    this.syncNotificationState();
+  }
+
+  changeSearch(): void {
+    this.goBackToChat();
   }
 
   goBackToChat(): void {
     void this.router.navigate([
       '/chat',
     ]);
+  }
+
+  handleImageError(
+    event: Event,
+  ): void {
+    const image =
+      event.target as
+        HTMLImageElement;
+
+    if (
+      image.src ===
+      this.fallbackImageUrl
+    ) {
+      return;
+    }
+
+    image.src =
+      this.fallbackImageUrl;
+  }
+
+  private continueNotifySetup():
+    void {
+    const permission =
+      this.notificationWatchService
+        .getPushPermissionStatus();
+
+    this.handlePushPermission(
+      permission,
+    );
+  }
+
+  private handlePushPermission(
+    permission:
+      PushPermissionStatus,
+  ): void {
+    switch (permission) {
+      case 'granted':
+        this.activateNotification();
+        return;
+
+      case 'default':
+        this.notifySetupState =
+          'permission';
+        return;
+
+      case 'denied':
+        this.notifySetupState =
+          'denied';
+        return;
+
+      case 'unsupported':
+        this.notifySetupState =
+          'unsupported';
+        return;
+    }
+  }
+
+  private activateNotification():
+    void {
+    const user =
+      this.authService
+        .getCurrentUser();
+
+    if (!user) {
+      this.notifySetupState =
+        'auth';
+
+      return;
+    }
+
+    this.notificationWatchService
+      .createWatch({
+        userId: user.id,
+
+        experienceId:
+          this.result.id,
+
+        experienceTitle:
+          this.result.title,
+
+        requestedDate:
+          this.result
+            .requestedDate,
+
+        travellers:
+          this.result
+            .requestedTicketCount,
+      });
+
+    this.hasActiveNotification =
+      true;
+
+    this.notifySetupState =
+      'active';
+  }
+
+  private syncNotificationState():
+    void {
+    const user =
+      this.authService
+        .getCurrentUser();
+
+    if (!user) {
+      this.hasActiveNotification =
+        false;
+
+      return;
+    }
+
+    this.hasActiveNotification =
+      this.notificationWatchService
+        .hasActiveWatch(
+          user.id,
+          this.result.id,
+          this.result.requestedDate,
+          this.result
+            .requestedTicketCount,
+        );
   }
 
   private storeSearch(

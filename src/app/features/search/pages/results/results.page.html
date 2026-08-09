@@ -2,20 +2,29 @@
   [fullscreen]="true"
   class="results-page"
 >
-  <main class="results-container">
+  <main
+    class="results-container"
+    aria-live="polite"
+  >
     <section
       class="hero"
-      [class.hero--without-image]="!result.imageUrl"
+      [class.hero--without-image]="
+        !result.imageUrl
+      "
     >
       @if (result.imageUrl) {
         <img
           [src]="result.imageUrl"
           [alt]="result.title"
           class="hero-image"
+          (error)="handleImageError($event)"
         />
       }
 
-      <div class="hero-overlay"></div>
+      <div
+        class="hero-overlay"
+        aria-hidden="true"
+      ></div>
 
       <div class="hero-content">
         <p class="hero-location">
@@ -28,7 +37,10 @@
       </div>
     </section>
 
-    <section class="request-summary">
+    <section
+      class="request-summary"
+      aria-label="Search request summary"
+    >
       <div>
         <p class="summary-label">
           Your request
@@ -51,7 +63,10 @@
       @switch (result.state) {
         @case ('available') {
           <span
-            class="state-badge state-badge--available"
+            class="
+              state-badge
+              state-badge--available
+            "
           >
             Available
           </span>
@@ -59,7 +74,10 @@
 
         @case ('alternate-dates') {
           <span
-            class="state-badge state-badge--warning"
+            class="
+              state-badge
+              state-badge--warning
+            "
           >
             Other dates available
           </span>
@@ -67,7 +85,10 @@
 
         @case ('no-availability') {
           <span
-            class="state-badge state-badge--unavailable"
+            class="
+              state-badge
+              state-badge--unavailable
+            "
           >
             Unavailable
           </span>
@@ -75,7 +96,10 @@
 
         @case ('group-too-large') {
           <span
-            class="state-badge state-badge--warning"
+            class="
+              state-badge
+              state-badge--warning
+            "
           >
             Group size unavailable
           </span>
@@ -83,7 +107,10 @@
 
         @case ('provider-error') {
           <span
-            class="state-badge state-badge--error"
+            class="
+              state-badge
+              state-badge--error
+            "
           >
             Search interrupted
           </span>
@@ -91,13 +118,35 @@
 
         @case ('unsupported-experience') {
           <span
-            class="state-badge state-badge--error"
+            class="
+              state-badge
+              state-badge--error
+            "
           >
             Not supported yet
           </span>
         }
       }
     </section>
+
+    <div class="change-search-row">
+      <button
+        type="button"
+        class="text-button"
+        (click)="changeSearch()"
+      >
+        ← Change search
+      </button>
+    </div>
+
+    @if (isChangingExperience) {
+      <div
+        class="result-loading"
+        role="status"
+      >
+        Checking the alternative experience…
+      </div>
+    }
 
     @switch (result.state) {
       @case ('available') {
@@ -137,7 +186,9 @@
                 [class.date-chip--active]="
                   selectedDate === date.date
                 "
-                (click)="selectAlternateDate(date)"
+                (click)="
+                  selectAlternateDate(date)
+                "
               >
                 {{ date.date }}
               </button>
@@ -186,16 +237,34 @@
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  class="
-                    primary-button
-                    slot-button
-                  "
-                  (click)="continueBooking(slot)"
-                >
-                  Continue Booking
-                </button>
+                <div class="booking-action">
+                  <button
+                    type="button"
+                    class="
+                      primary-button
+                      slot-button
+                    "
+                    [disabled]="
+                      openingSlotId !== null
+                    "
+                    (click)="
+                      continueBooking(slot)
+                    "
+                  >
+                    @if (
+                      openingSlotId === slot.id
+                    ) {
+                      Opening provider…
+                    } @else {
+                      Continue Booking
+                    }
+                  </button>
+
+                  <p class="booking-trust">
+                    Opens the official booking
+                    provider in a new tab.
+                  </p>
+                </div>
               </article>
             }
           </div>
@@ -226,13 +295,26 @@
               travellers.
             </p>
 
-            <button
-              type="button"
-              class="secondary-button"
-              (click)="notifyMe()"
-            >
-              Notify me
-            </button>
+            <div class="message-actions">
+              <button
+                type="button"
+                class="secondary-button"
+                [disabled]="
+                  hasActiveNotification
+                "
+                (click)="notifyMe()"
+              >
+                {{ notificationButtonLabel }}
+              </button>
+
+              <button
+                type="button"
+                class="text-button"
+                (click)="changeSearch()"
+              >
+                Change search
+              </button>
+            </div>
           </article>
 
           <div class="section-heading">
@@ -259,7 +341,9 @@
                 [class.date-chip--active]="
                   selectedDate === date.date
                 "
-                (click)="selectAlternateDate(date)"
+                (click)="
+                  selectAlternateDate(date)
+                "
               >
                 {{ date.date }}
               </button>
@@ -309,16 +393,34 @@
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    class="
-                      primary-button
-                      slot-button
-                    "
-                    (click)="continueBooking(slot)"
-                  >
-                    Continue Booking
-                  </button>
+                  <div class="booking-action">
+                    <button
+                      type="button"
+                      class="
+                        primary-button
+                        slot-button
+                      "
+                      [disabled]="
+                        openingSlotId !== null
+                      "
+                      (click)="
+                        continueBooking(slot)
+                      "
+                    >
+                      @if (
+                        openingSlotId === slot.id
+                      ) {
+                        Opening provider…
+                      } @else {
+                        Continue Booking
+                      }
+                    </button>
+
+                    <p class="booking-trust">
+                      Opens the official booking
+                      provider in a new tab.
+                    </p>
+                  </div>
                 </article>
               }
             </div>
@@ -353,17 +455,20 @@
               <button
                 type="button"
                 class="primary-button"
+                [disabled]="
+                  hasActiveNotification
+                "
                 (click)="notifyMe()"
               >
-                Notify me
+                {{ notificationButtonLabel }}
               </button>
 
               <button
                 type="button"
                 class="secondary-button"
-                (click)="goBackToChat()"
+                (click)="changeSearch()"
               >
-                Back to chat
+                Change search
               </button>
             </div>
           </article>
@@ -395,6 +500,9 @@
                     [src]="experience.imageUrl"
                     [alt]="experience.title"
                     class="experience-image"
+                    (error)="
+                      handleImageError($event)
+                    "
                   />
 
                   <div class="experience-content">
@@ -438,9 +546,7 @@
                       'available'
                     ) {
                       <p
-                        class="
-                          alternative-description
-                        "
+                        class="alternative-description"
                       >
                         Available for all
                         {{ result.requestedTicketCount }}
@@ -449,19 +555,14 @@
                       </p>
 
                       <div
-                        class="
-                          alternative-slot-list
-                        "
+                        class="alternative-slot-list"
                       >
                         @for (
                           slot of
-                            experience
-                              .requestedDateSlots;
+                            experience.requestedDateSlots;
                           track slot.id
                         ) {
-                          <div
-                            class="alternative-slot"
-                          >
+                          <div class="alternative-slot">
                             <div
                               class="
                                 alternative-slot-details
@@ -472,40 +573,56 @@
                               </strong>
 
                               <span>
-                                €{{
-                                  slot.pricePerPerson
-                                }}
+                                €{{ slot.pricePerPerson }}
                                 per person
                               </span>
 
                               <small>
-                                {{
-                                  slot.availableTickets
-                                }}
+                                {{ slot.availableTickets }}
                                 tickets available
                               </small>
                             </div>
 
-                            <button
-                              type="button"
+                            <div
                               class="
-                                primary-button
-                                alternative-book-button
-                              "
-                              (click)="
-                                continueBooking(slot)
+                                alternative-book-action
                               "
                             >
-                              Continue Booking
-                            </button>
+                              <button
+                                type="button"
+                                class="
+                                  primary-button
+                                  alternative-book-button
+                                "
+                                [disabled]="
+                                  openingSlotId !== null
+                                "
+                                (click)="
+                                  continueBooking(slot)
+                                "
+                              >
+                                @if (
+                                  openingSlotId ===
+                                  slot.id
+                                ) {
+                                  Opening…
+                                } @else {
+                                  Continue Booking
+                                }
+                              </button>
+
+                              <small
+                                class="booking-trust"
+                              >
+                                Official provider
+                              </small>
+                            </div>
                           </div>
                         }
                       </div>
                     } @else {
                       <p
-                        class="
-                          alternative-description
-                        "
+                        class="alternative-description"
                       >
                         Your full group can be
                         accommodated on
@@ -521,6 +638,9 @@
                         class="
                           secondary-button
                           alternative-view-button
+                        "
+                        [disabled]="
+                          isChangingExperience
                         "
                         (click)="
                           selectSuggestedExperience(
@@ -590,15 +710,18 @@
               <button
                 type="button"
                 class="primary-button"
+                [disabled]="
+                  hasActiveNotification
+                "
                 (click)="notifyMe()"
               >
-                Notify me
+                {{ notificationButtonLabel }}
               </button>
 
               <button
                 type="button"
                 class="secondary-button"
-                (click)="goBackToChat()"
+                (click)="changeSearch()"
               >
                 Change search
               </button>
@@ -632,6 +755,9 @@
                     [src]="experience.imageUrl"
                     [alt]="experience.title"
                     class="experience-image"
+                    (error)="
+                      handleImageError($event)
+                    "
                   />
 
                   <div class="experience-content">
@@ -675,9 +801,7 @@
                       'available'
                     ) {
                       <p
-                        class="
-                          alternative-description
-                        "
+                        class="alternative-description"
                       >
                         Available for all
                         {{ result.requestedTicketCount }}
@@ -686,19 +810,14 @@
                       </p>
 
                       <div
-                        class="
-                          alternative-slot-list
-                        "
+                        class="alternative-slot-list"
                       >
                         @for (
                           slot of
-                            experience
-                              .requestedDateSlots;
+                            experience.requestedDateSlots;
                           track slot.id
                         ) {
-                          <div
-                            class="alternative-slot"
-                          >
+                          <div class="alternative-slot">
                             <div
                               class="
                                 alternative-slot-details
@@ -709,40 +828,56 @@
                               </strong>
 
                               <span>
-                                €{{
-                                  slot.pricePerPerson
-                                }}
+                                €{{ slot.pricePerPerson }}
                                 per person
                               </span>
 
                               <small>
-                                {{
-                                  slot.availableTickets
-                                }}
+                                {{ slot.availableTickets }}
                                 tickets available
                               </small>
                             </div>
 
-                            <button
-                              type="button"
+                            <div
                               class="
-                                primary-button
-                                alternative-book-button
-                              "
-                              (click)="
-                                continueBooking(slot)
+                                alternative-book-action
                               "
                             >
-                              Continue Booking
-                            </button>
+                              <button
+                                type="button"
+                                class="
+                                  primary-button
+                                  alternative-book-button
+                                "
+                                [disabled]="
+                                  openingSlotId !== null
+                                "
+                                (click)="
+                                  continueBooking(slot)
+                                "
+                              >
+                                @if (
+                                  openingSlotId ===
+                                  slot.id
+                                ) {
+                                  Opening…
+                                } @else {
+                                  Continue Booking
+                                }
+                              </button>
+
+                              <small
+                                class="booking-trust"
+                              >
+                                Official provider
+                              </small>
+                            </div>
                           </div>
                         }
                       </div>
                     } @else {
                       <p
-                        class="
-                          alternative-description
-                        "
+                        class="alternative-description"
                       >
                         Your full group can be
                         accommodated on
@@ -758,6 +893,9 @@
                         class="
                           secondary-button
                           alternative-view-button
+                        "
+                        [disabled]="
+                          isChangingExperience
                         "
                         (click)="
                           selectSuggestedExperience(
@@ -827,9 +965,9 @@
               <button
                 type="button"
                 class="secondary-button"
-                (click)="goBackToChat()"
+                (click)="changeSearch()"
               >
-                Back to chat
+                Change search
               </button>
             </div>
           </article>
@@ -870,13 +1008,184 @@
             <button
               type="button"
               class="primary-button"
-              (click)="goBackToChat()"
+              (click)="changeSearch()"
             >
-              Back to chat
+              Change search
             </button>
           </article>
         </section>
       }
+    }
+
+    @if (notifySetupState) {
+      <section
+        class="result-section"
+        aria-live="polite"
+      >
+        <article class="message-card">
+          @switch (notifySetupState) {
+            @case ('auth') {
+              <p class="section-kicker">
+                Sign in required
+              </p>
+
+              <h2>
+                Sign in to save this availability alert
+              </h2>
+
+              <p>
+                Your alert needs to be linked to your
+                Trovato account so we know which device
+                to notify when matching availability
+                appears.
+              </p>
+
+              <div class="message-actions">
+                <button
+                  type="button"
+                  class="primary-button"
+                  (click)="signInAndContinue()"
+                >
+                  Sign in and continue
+                </button>
+
+                <button
+                  type="button"
+                  class="secondary-button"
+                  (click)="closeNotifySetup()"
+                >
+                  Not now
+                </button>
+              </div>
+            }
+
+            @case ('permission') {
+              <p class="section-kicker">
+                Push notifications
+              </p>
+
+              <h2>
+                Allow Trovato to notify you
+              </h2>
+
+              <p>
+                We will only use push notifications
+                for availability alerts you choose to
+                activate.
+              </p>
+
+              <div class="message-actions">
+                <button
+                  type="button"
+                  class="primary-button"
+                  [disabled]="
+                    isRequestingPushPermission
+                  "
+                  (click)="
+                    enablePushNotifications()
+                  "
+                >
+                  @if (
+                    isRequestingPushPermission
+                  ) {
+                    Requesting permission…
+                  } @else {
+                    Enable notifications
+                  }
+                </button>
+
+                <button
+                  type="button"
+                  class="secondary-button"
+                  (click)="closeNotifySetup()"
+                >
+                  Not now
+                </button>
+              </div>
+            }
+
+            @case ('denied') {
+              <p class="section-kicker">
+                Notifications blocked
+              </p>
+
+              <h2>
+                Push notifications are disabled
+              </h2>
+
+              <p>
+                Enable notifications for Trovato in
+                your browser or device settings, then
+                return here and try again.
+              </p>
+
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="closeNotifySetup()"
+              >
+                Close
+              </button>
+            }
+
+            @case ('unsupported') {
+              <p class="section-kicker">
+                Notifications unavailable
+              </p>
+
+              <h2>
+                Push notifications are not supported
+                here
+              </h2>
+
+              <p>
+                This browser or environment does not
+                currently support the notification
+                permission needed for availability
+                alerts.
+              </p>
+
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="closeNotifySetup()"
+              >
+                Close
+              </button>
+            }
+
+            @case ('active') {
+              <p class="section-kicker">
+                Alert active
+              </p>
+
+              <h2>
+                We’ll watch this availability
+              </h2>
+
+              <p>
+                Trovato will watch
+                {{ result.title }} for
+                {{ result.requestedTicketCount }}
+                {{
+                  result.requestedTicketCount === 1
+                    ? 'traveller'
+                    : 'travellers'
+                }}
+                on {{ result.requestedDate }}.
+              </p>
+
+              <button
+                type="button"
+                class="primary-button"
+                (click)="closeNotifySetup()"
+              >
+                Done
+              </button>
+            }
+          }
+        </article>
+      </section>
     }
   </main>
 </ion-content>

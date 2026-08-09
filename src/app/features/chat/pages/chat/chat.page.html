@@ -1,71 +1,163 @@
-<ion-content [fullscreen]="true" class="chat-page">
-  <main class="chat-container">
+<ion-content
+  [fullscreen]="true"
+  class="chat-page"
+>
+  <main
+    class="chat-container"
+    [attr.aria-busy]="isSending"
+  >
     @if (!hasConversation) {
-      <header class="chat-header">
-        <img
-          src="assets/images/trovato-logo.png"
-          alt="Trovato AI"
-          class="chat-logo"
-        />
+      <header>
+        <p class="chat-kicker">
+          Your cultural travel assistant
+        </p>
 
-        <p class="chat-kicker">Your cultural travel assistant</p>
-
-        <h1>What would you like to explore in Italy?</h1>
+        <h1>
+          What would you like to explore
+          in Italy?
+        </h1>
 
         <p class="chat-intro">
-          Tell us naturally. Add a place, date, group size, or type of experience.
+          Tell us naturally. Add a place,
+          date, group size, or type of
+          experience.
         </p>
       </header>
 
-      <section class="suggestions" aria-label="Suggested searches">
+      <section
+        class="suggestions"
+        aria-label="Suggested searches"
+      >
         <button
           type="button"
-          (click)="selectSuggestion('I would like to explore museums in Italy')"
+          [disabled]="isSending"
+          (click)="
+            selectSuggestion(
+              'I would like to explore museums in Italy'
+            )
+          "
         >
-          <span class="suggestion-icon" aria-hidden="true">🏛️</span>
-          <span class="suggestion-label">Museums</span>
+          <span
+            class="suggestion-icon"
+            aria-hidden="true"
+          >
+            🏛️
+          </span>
+
+          <span class="suggestion-label">
+            Museums
+          </span>
         </button>
 
         <button
           type="button"
-          (click)="selectSuggestion('Show me art museums in Florence')"
+          [disabled]="isSending"
+          (click)="
+            selectSuggestion(
+              'Show me art museums in Florence'
+            )
+          "
         >
-          <span class="suggestion-icon" aria-hidden="true">🎨</span>
-          <span class="suggestion-label">Art</span>
+          <span
+            class="suggestion-icon"
+            aria-hidden="true"
+          >
+            🎨
+          </span>
+
+          <span class="suggestion-label">
+            Art
+          </span>
         </button>
 
         <button
           type="button"
-          (click)="selectSuggestion('Find wine tours in Tuscany')"
+          [disabled]="isSending"
+          (click)="
+            selectSuggestion(
+              'Find wine tours in Tuscany'
+            )
+          "
         >
-          <span class="suggestion-icon" aria-hidden="true">🍷</span>
-          <span class="suggestion-label">Wine tours</span>
+          <span
+            class="suggestion-icon"
+            aria-hidden="true"
+          >
+            🍷
+          </span>
+
+          <span class="suggestion-label">
+            Wine tours
+          </span>
         </button>
 
         <button
           type="button"
-          (click)="selectSuggestion('Find football matches in Italy')"
+          [disabled]="isSending"
+          (click)="
+            selectSuggestion(
+              'Find football matches in Italy'
+            )
+          "
         >
-          <span class="suggestion-icon" aria-hidden="true">⚽</span>
-          <span class="suggestion-label">Football</span>
+          <span
+            class="suggestion-icon"
+            aria-hidden="true"
+          >
+            ⚽
+          </span>
+
+          <span class="suggestion-label">
+            Football
+          </span>
         </button>
       </section>
     } @else {
-      <section class="conversation" aria-live="polite">
-        @for (message of messages; track message.id) {
+      <section
+        class="conversation"
+        aria-live="polite"
+      >
+        @for (
+          message of messages;
+          track message.id
+        ) {
           <article
             class="message"
-            [class.message--user]="message.sender === 'user'"
-            [class.message--assistant]="message.sender === 'assistant'"
+            [class.message--user]="
+              message.sender === 'user'
+            "
+            [class.message--assistant]="
+              message.sender ===
+              'assistant'
+            "
           >
-            <p>{{ message.text }}</p>
+            <p>
+              {{ message.text }}
+            </p>
+          </article>
+        }
+
+        @if (isSending) {
+          <article
+            class="
+              message
+              message--assistant
+            "
+            role="status"
+          >
+            <p>
+              Trovato AI is thinking…
+            </p>
           </article>
         }
       </section>
     }
 
     <section class="chat-composer">
-      <label for="travel-request" class="sr-only">
+      <label
+        for="travel-request"
+        class="sr-only"
+      >
         Describe what you want to explore
       </label>
 
@@ -74,14 +166,23 @@
         rows="3"
         placeholder="Ask Trovato AI anything..."
         [(ngModel)]="userInput"
+        [disabled]="isSending"
       ></textarea>
 
       <button
         type="button"
         class="send-button"
+        [disabled]="
+          isSending ||
+          !userInput.trim()
+        "
         (click)="sendMessage()"
       >
-        Send
+        @if (isSending) {
+          Thinking…
+        } @else {
+          Send
+        }
       </button>
     </section>
   </main>
