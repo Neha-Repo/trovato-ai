@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OllamaService } from './ollama.service';
+
 interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
@@ -23,38 +24,139 @@ interface ExtractedDate {
   parsedDate: Date;
 }
 
+interface ExperienceAlias {
+  canonicalName: string;
+  aliases: string[];
+}
+
 @Injectable()
 export class ChatService {
+  private readonly experienceAliases: ExperienceAlias[] = [
+    {
+      canonicalName: 'Vatican Museums',
+      aliases: ['vatican museums', 'vatican museum', 'vatican'],
+    },
+    {
+      canonicalName: 'Uffizi Gallery',
+      aliases: ['uffizi gallery', 'uffizi galleries', 'uffizi'],
+    },
+    {
+      canonicalName: 'Accademia Gallery',
+      aliases: [
+        'accademia gallery',
+        'galleria dell accademia',
+        "galleria dell'accademia",
+        'accademia',
+      ],
+    },
+    {
+      canonicalName: 'Colosseum',
+      aliases: ['colosseum', 'coliseum', 'colosseo'],
+    },
+    {
+      canonicalName: 'Borghese Gallery',
+      aliases: ['borghese gallery', 'galleria borghese', 'borghese'],
+    },
+    {
+      canonicalName: 'Pompeii Archaeological Park',
+      aliases: ['pompeii archaeological park', 'pompeii ruins', 'pompeii'],
+    },
+    {
+      canonicalName: 'Herculaneum Archaeological Park',
+      aliases: [
+        'herculaneum archaeological park',
+        'herculaneum ruins',
+        'herculaneum',
+        'ercolano',
+      ],
+    },
+    {
+      canonicalName: 'National Archaeological Museum of Naples',
+      aliases: [
+        'national archaeological museum of naples',
+        'naples national archaeological museum',
+        'naples archaeological museum',
+        'museo archeologico nazionale di napoli',
+        'mann',
+      ],
+    },
+    {
+      canonicalName: 'Mount Vesuvius',
+      aliases: ['mount vesuvius', 'vesuvius', 'vesuvio'],
+    },
+    {
+      canonicalName: 'Amalfi Coast',
+      aliases: ['amalfi coast', 'amalfi'],
+    },
+  ];
+
+  private readonly knownCities = [
+    'vatican city',
+    'rome',
+    'florence',
+    'milan',
+    'venice',
+    'siena',
+    'pompeii',
+    'naples',
+    'herculaneum',
+    'amalfi',
+  ];
+
   constructor(private readonly ollamaService: OllamaService) {}
+
   async sendMessage(messages: ChatMessage[]): Promise<ChatResponse> {
     const userMessages = messages
       .filter((message) => message.sender === 'user')
       .map((message) => message.text.trim().toLowerCase());
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const latestUserMessage = userMessages.at(-1) ?? '';
-    const conversation = userMessages.join(' ');
 
-    let experience = this.extractExperience(conversation);
-    let city = this.extractCity(conversation);
+    /*
+     * Extract conversational fields using
+     * newest-message-first precedence.
+     *
+     * This prevents an old attraction or city
+     * from overriding a newer correction.
+     */
+    let experience = this.extractExperienceFromMessages(userMessages);
+
+    let city = this.extractCityFromMessages(userMessages);
+
     let extractedDate = this.extractDate(userMessages);
-    let travellers = this.extractTravellerCount(
-      conversation,
-      latestUserMessage,
-    );
+
+    let travellers = this.extractTravellerCountFromMessages(userMessages);
 
     try {
       const aiSearch = await this.ollamaService.extractSearch(messages);
 
-      experience = aiSearch.experience ?? experience;
-      city = aiSearch.city ?? city;
-      travellers = aiSearch.travellers ?? travellers;
+      /*
+       * Deterministic extraction wins only
+       * when it found a relevant value using
+       * newest-message-first precedence.
+       *
+       * Ollama fills remaining gaps.
+       */
+      experience = experience ?? aiSearch.experience;
 
-      if (aiSearch.date) {
-  extractedDate = this.extractDate([aiSearch.date]);
-}
+      city = city ?? aiSearch.city;
+
+      travellers = travellers ?? aiSearch.travellers;
+
+      if (!extractedDate && aiSearch.date) {
+        extractedDate = this.extractDate([aiSearch.date]);
+      }
     } catch (error) {
       console.warn('Falling back to rule-based extraction.', error);
     }
+
+    console.log('Trovato search extraction:', {
+      experience,
+      city,
+      date: extractedDate?.value ?? null,
+      travellers,
+    });
 
     if (!experience) {
       return {
@@ -95,7 +197,9 @@ export class ChatService {
     return {
       reply:
         'Perfect! I have everything I need. Let me check the available time slots for your group.',
+
       searchReady: true,
+
       search: {
         experience,
         city,
@@ -105,37 +209,52 @@ export class ChatService {
     };
   }
 
-  private extractExperience(conversation: string): string | null {
-    if (conversation.includes('vatican')) {
-      return 'Vatican Museums';
+  private extractExperienceFromMessages(userMessages: string[]): string | null {
+    for (let index = userMessages.length - 1; index >= 0; index -= 1) {
+      const experience = this.extractExperienceFromText(userMessages[index]);
+
+      if (experience) {
+        return experience;
+      }
     }
 
-    if (conversation.includes('museum') || conversation.includes('gallery')) {
-      return 'Museums';
+    return null;
+  }
+
+  private extractExperienceFromText(text: string): string | null {
+    for (const experience of this.experienceAliases) {
+      const matched = experience.aliases.some((alias) => text.includes(alias));
+
+      if (matched) {
+        return experience.canonicalName;
+      }
     }
 
-    if (conversation.includes('wine') || conversation.includes('vineyard')) {
+    if (text.includes('wine') || text.includes('vineyard')) {
       return 'Wine tour';
     }
 
-    if (conversation.includes('football') || conversation.includes('match')) {
+    if (text.includes('football') || text.includes('match')) {
       return 'Football match';
     }
 
     return null;
   }
 
-  private extractCity(conversation: string): string | null {
-    const cities = [
-      'vatican city',
-      'rome',
-      'florence',
-      'milan',
-      'venice',
-      'siena',
-    ];
+  private extractCityFromMessages(userMessages: string[]): string | null {
+    for (let index = userMessages.length - 1; index >= 0; index -= 1) {
+      const city = this.extractCityFromText(userMessages[index]);
 
-    const city = cities.find((value) => conversation.includes(value));
+      if (city) {
+        return city;
+      }
+    }
+
+    return null;
+  }
+
+  private extractCityFromText(text: string): string | null {
+    const city = this.knownCities.find((value) => text.includes(value));
 
     if (!city) {
       return null;
@@ -165,16 +284,19 @@ export class ChatService {
     if (/\btoday\b/i.test(text)) {
       return {
         value: this.formatDate(today),
+
         parsedDate: today,
       };
     }
 
     if (/\btomorrow\b/i.test(text)) {
       const tomorrow = new Date(today);
+
       tomorrow.setDate(tomorrow.getDate() + 1);
 
       return {
         value: this.formatDate(tomorrow),
+
         parsedDate: tomorrow,
       };
     }
@@ -186,7 +308,9 @@ export class ChatService {
     if (dayMonthMatch) {
       return this.createExtractedDate(
         Number(dayMonthMatch[1]),
+
         dayMonthMatch[2],
+
         dayMonthMatch[3] ? Number(dayMonthMatch[3]) : today.getFullYear(),
       );
     }
@@ -198,7 +322,9 @@ export class ChatService {
     if (monthDayMatch) {
       return this.createExtractedDate(
         Number(monthDayMatch[2]),
+
         monthDayMatch[1],
+
         monthDayMatch[3] ? Number(monthDayMatch[3]) : today.getFullYear(),
       );
     }
@@ -218,6 +344,7 @@ export class ChatService {
     }
 
     const parsedDate = new Date(year, monthIndex, day);
+
     const isValidDate =
       parsedDate.getFullYear() === year &&
       parsedDate.getMonth() === monthIndex &&
@@ -229,6 +356,7 @@ export class ChatService {
 
     return {
       value: this.formatDate(parsedDate),
+
       parsedDate: this.startOfDay(parsedDate),
     };
   }
@@ -237,25 +365,36 @@ export class ChatService {
     const monthIndexes: Record<string, number> = {
       jan: 0,
       january: 0,
+
       feb: 1,
       february: 1,
+
       mar: 2,
       march: 2,
+
       apr: 3,
       april: 3,
+
       may: 4,
+
       jun: 5,
       june: 5,
+
       jul: 6,
       july: 6,
+
       aug: 7,
       august: 7,
+
       sep: 8,
       september: 8,
+
       oct: 9,
       october: 9,
+
       nov: 10,
       november: 10,
+
       dec: 11,
       december: 11,
     };
@@ -281,13 +420,24 @@ export class ChatService {
     }).format(date);
   }
 
-  private extractTravellerCount(
-    conversation: string,
-    latestUserMessage: string,
+  private extractTravellerCountFromMessages(
+    userMessages: string[],
   ): number | null {
+    for (let index = userMessages.length - 1; index >= 0; index -= 1) {
+      const count = this.extractTravellerCountFromText(userMessages[index]);
+
+      if (count) {
+        return count;
+      }
+    }
+
+    return null;
+  }
+
+  private extractTravellerCountFromText(text: string): number | null {
     const explicitMatches = [
-      ...conversation.matchAll(
-        /\b(\d+)\s*(ticket|tickets|traveller|travellers|person|people|adult|adults)\b/gi,
+      ...text.matchAll(
+        /\b(\d+)\s*(ticket|tickets|traveller|travellers|traveler|travelers|person|people|adult|adults)\b/gi,
       ),
     ];
 
@@ -299,18 +449,12 @@ export class ChatService {
       return count > 0 ? count : null;
     }
 
-    if (/^\d+$/.test(latestUserMessage)) {
-      const count = Number(latestUserMessage);
+    if (/^\d+$/.test(text.trim())) {
+      const count = Number(text.trim());
 
       return count > 0 ? count : null;
     }
 
     return null;
-  }
-
-  private simulateDelay(): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(resolve, 800);
-    });
   }
 }

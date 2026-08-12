@@ -8,6 +8,9 @@ import {
   SuggestedExperience,
 } from '../models/search-result.model';
 import {
+  AvailabilityProviderService,
+} from '../providers/availability-provider.service';
+import {
   Experience,
   ExperienceCatalogService,
 } from './experience-catalog.service';
@@ -17,18 +20,6 @@ interface SearchRequest {
   city?: string;
   requestedDate: string;
   requestedTicketCount: number;
-}
-
-interface ProviderAvailability {
-  providerError: boolean;
-  requestedDate: string;
-  requestedDateSlots: AvailabilitySlot[];
-  alternateDates: AvailableDate[];
-}
-
-interface NormalizedDate {
-  key: string;
-  displayDate: string;
 }
 
 interface ExperienceEvaluation {
@@ -47,77 +38,96 @@ interface ExperienceEvaluation {
   >;
 }
 
-interface MockSlotTemplate {
-  time: string;
-  availableTickets: number;
-  pricePerPerson: number;
-}
-
-interface MockDayTemplate {
-  daysFromToday: number;
-  slots: MockSlotTemplate[];
-}
-
 @Injectable({
   providedIn: 'root',
 })
 export class SearchResultsService {
-  private readonly defaultRequest: SearchRequest = {
-    experience: 'Vatican Museums',
-    city: 'Rome',
-    requestedDate: 'tomorrow',
-    requestedTicketCount: 3,
-  };
+  private readonly defaultRequest:
+    SearchRequest = {
+      experience: 'Vatican Museums',
+      city: 'Rome',
+      requestedDate: 'tomorrow',
+      requestedTicketCount: 3,
+    };
 
   constructor(
-    private readonly experienceCatalogService: ExperienceCatalogService,
+    private readonly experienceCatalogService:
+      ExperienceCatalogService,
+
+    private readonly availabilityProviderService:
+      AvailabilityProviderService,
   ) {}
 
   search(
-    request: SearchRequest = this.defaultRequest,
+    request:
+      SearchRequest =
+        this.defaultRequest,
   ): SearchResult {
-    const experience = this.resolveExperience(
-      request.experience,
-    );
+    const experience =
+      this.resolveExperience(
+        request.experience,
+      );
 
     if (!experience) {
-      return this.createUnsupportedResult(request);
+      return this.createUnsupportedResult(
+        request,
+      );
     }
 
     /*
-     * The catalog owns the canonical location.
+     * The experience catalog owns the
+     * canonical location.
      *
-     * If somebody asks for "Uffizi in Rome", the
-     * experience still resolves to Florence.
+     * For example, if somebody asks for
+     * "Uffizi in Rome", Uffizi still
+     * resolves to Florence.
      */
-    const normalizedRequest: SearchRequest = {
+    const normalizedRequest:
+      SearchRequest = {
       ...request,
-      experience: experience.title,
-      city: experience.city,
+
+      experience:
+        experience.title,
+
+      city:
+        experience.city,
     };
 
-    const evaluation = this.evaluateExperience(
-      experience,
-      normalizedRequest.requestedDate,
-      normalizedRequest.requestedTicketCount,
-    );
+    const evaluation =
+      this.evaluateExperience(
+        experience,
+
+        normalizedRequest
+          .requestedDate,
+
+        normalizedRequest
+          .requestedTicketCount,
+      );
 
     normalizedRequest.requestedDate =
       evaluation.requestedDate;
 
-    if (evaluation.providerError) {
+    if (
+      evaluation.providerError
+    ) {
       return this.createResult({
         experience,
-        request: normalizedRequest,
+
+        request:
+          normalizedRequest,
+
         evaluation,
+
         errorMessage:
           'We could not retrieve live availability right now. Please try again shortly.',
       });
     }
 
     const shouldSuggestAlternatives =
-      evaluation.state === 'no-availability' ||
-      evaluation.state === 'group-too-large';
+      evaluation.state ===
+        'no-availability' ||
+      evaluation.state ===
+        'group-too-large';
 
     const suggestedExperiences =
       shouldSuggestAlternatives
@@ -129,8 +139,12 @@ export class SearchResultsService {
 
     return this.createResult({
       experience,
-      request: normalizedRequest,
+
+      request:
+        normalizedRequest,
+
       evaluation,
+
       suggestedExperiences,
     });
   }
@@ -140,56 +154,129 @@ export class SearchResultsService {
     requestedDate: string,
     requestedTicketCount: number,
   ): ExperienceEvaluation {
-    const providerAvailability =
-      this.getMockProviderAvailability(
-        requestedDate,
-        experience.bookingUrl,
-        experience.id,
-      );
+    /*
+     * SearchResultsService no longer
+     * knows how availability is obtained.
+     *
+     * It asks the provider registry for
+     * the provider that supports this
+     * experience.
+     */
+    const provider =
+      this.availabilityProviderService
+        .getProvider(
+          experience,
+        );
 
-    if (providerAvailability.providerError) {
+    /*
+     * Every provider returns the same
+     * normalized Trovato availability
+     * contract.
+     */
+    const providerAvailability =
+      provider.getAvailability({
+        experience,
+        requestedDate,
+      });
+
+    if (
+      providerAvailability
+        .providerError
+    ) {
       return {
         providerError: true,
+
         requestedDate:
-          providerAvailability.requestedDate,
+          providerAvailability
+            .requestedDate,
+
         requestedDateSlots: [],
+
         alternateDates: [],
-        largestAvailableGroupSize: 0,
-        state: 'provider-error',
+
+        largestAvailableGroupSize:
+          0,
+
+        state:
+          'provider-error',
       };
     }
 
+    /*
+     * Provider inventory tells us what
+     * exists.
+     *
+     * Trovato decides which slots are
+     * actually usable for this user's
+     * requested group size.
+     */
     const requestedDateSlots =
       this.filterBookableSlots(
-        providerAvailability.requestedDateSlots,
+        providerAvailability
+          .requestedDateSlots,
+
         requestedTicketCount,
       );
 
     const alternateDates =
-      providerAvailability.alternateDates
-        .map((availableDate) => ({
-          ...availableDate,
-          slots: this.filterBookableSlots(
-            availableDate.slots,
-            requestedTicketCount,
-          ),
-        }))
+      providerAvailability
+        .alternateDates
+        .map(
+          (
+            availableDate,
+          ) => ({
+            ...availableDate,
+
+            slots:
+              this.filterBookableSlots(
+                availableDate.slots,
+                requestedTicketCount,
+              ),
+          }),
+        )
         .filter(
-          (availableDate) =>
-            availableDate.slots.length > 0,
+          (
+            availableDate,
+          ) =>
+            availableDate
+              .slots
+              .length > 0,
+        );
+
+    /*
+     * Keep the unfiltered provider slots
+     * when calculating capacity.
+     *
+     * This lets Trovato distinguish:
+     *
+     * "nothing is available"
+     *
+     * from:
+     *
+     * "availability exists, but the
+     * requested group is too large".
+     */
+    const alternateProviderSlots =
+      providerAvailability
+        .alternateDates
+        .reduce<
+          AvailabilitySlot[]
+        >(
+          (
+            slots,
+            availableDate,
+          ) => [
+            ...slots,
+            ...availableDate.slots,
+          ],
+          [],
         );
 
     const allProviderSlots = [
-      ...providerAvailability.requestedDateSlots,
-      ...providerAvailability.alternateDates.reduce<
-        AvailabilitySlot[]
-      >(
-        (slots, availableDate) => [
-          ...slots,
-          ...availableDate.slots,
-        ],
-        [],
-      ),
+      ...providerAvailability
+        .requestedDateSlots,
+
+      ...alternateProviderSlots,
     ];
 
     const largestAvailableGroupSize =
@@ -197,144 +284,227 @@ export class SearchResultsService {
         allProviderSlots,
       );
 
-    const state = this.determineState({
-      requestedDateSlots,
-      alternateDates,
-      largestAvailableGroupSize,
-      requestedTicketCount,
-    });
+    const state =
+      this.determineState({
+        requestedDateSlots,
+
+        alternateDates,
+
+        largestAvailableGroupSize,
+
+        requestedTicketCount,
+      });
 
     return {
       providerError: false,
+
       requestedDate:
-        providerAvailability.requestedDate,
+        providerAvailability
+          .requestedDate,
+
       requestedDateSlots,
+
       alternateDates,
+
       largestAvailableGroupSize,
+
       state,
     };
   }
 
   private getSuggestedExperiences(
-    requestedExperience: Experience,
-    request: SearchRequest,
+    requestedExperience:
+      Experience,
+
+    request:
+      SearchRequest,
   ): SuggestedExperience[] {
     /*
-     * Ask for more than we intend to display because
-     * some candidates may fail the availability test.
+     * Ask the catalog for more
+     * alternatives than we intend to
+     * display.
+     *
+     * Some candidates may fail their
+     * availability check.
      */
     const geographicCandidates =
-      this.experienceCatalogService.getAlternatives(
-        requestedExperience.id,
-        requestedExperience.city,
-        10,
-      );
+      this.experienceCatalogService
+        .getAlternatives(
+          requestedExperience.id,
 
-    const sameDateSuggestions: SuggestedExperience[] =
-      [];
+          requestedExperience.city,
 
-    const alternateDateSuggestions: SuggestedExperience[] =
-      [];
+          10,
+        );
 
-    for (const candidate of geographicCandidates) {
-      const evaluation = this.evaluateExperience(
-        candidate,
-        request.requestedDate,
-        request.requestedTicketCount,
-      );
+    const sameDateSuggestions:
+      SuggestedExperience[] = [];
+
+    const alternateDateSuggestions:
+      SuggestedExperience[] = [];
+
+    for (
+      const candidate of
+        geographicCandidates
+    ) {
+      /*
+       * evaluateExperience() goes
+       * through the provider registry.
+       *
+       * This means alternatives can use
+       * completely different providers
+       * from the originally requested
+       * experience.
+       */
+      const evaluation =
+        this.evaluateExperience(
+          candidate,
+
+          request.requestedDate,
+
+          request
+            .requestedTicketCount,
+        );
 
       /*
        * Never recommend:
        *
        * - provider failures
-       * - experiences that cannot fit the full group
-       * - experiences with no useful availability
+       * - experiences that cannot fit
+       *   the full requested group
+       * - experiences with no useful
+       *   availability
        */
       if (
         evaluation.providerError ||
         (
-          evaluation.state !== 'available' &&
-          evaluation.state !== 'alternate-dates'
+          evaluation.state !==
+            'available' &&
+          evaluation.state !==
+            'alternate-dates'
         )
       ) {
         continue;
       }
 
-      const suggestion: SuggestedExperience = {
-        id: candidate.id,
-        title: candidate.title,
-        city: candidate.city,
-        location: candidate.location,
-        imageUrl: candidate.imageUrl,
+      const suggestion:
+        SuggestedExperience = {
+        id:
+          candidate.id,
 
-        state: evaluation.state,
+        title:
+          candidate.title,
 
-        requestedDate: evaluation.requestedDate,
+        city:
+          candidate.city,
+
+        location:
+          candidate.location,
+
+        imageUrl:
+          candidate.imageUrl,
+
+        state:
+          evaluation.state,
+
+        requestedDate:
+          evaluation
+            .requestedDate,
+
         requestedDateSlots:
-          evaluation.requestedDateSlots,
+          evaluation
+            .requestedDateSlots,
 
         alternateDates:
-          evaluation.alternateDates,
+          evaluation
+            .alternateDates,
       };
 
       /*
-       * Requested-date availability always ranks before
-       * alternatives that require changing the date.
+       * Same-date availability always
+       * ranks before an experience that
+       * requires changing the date.
        *
-       * Geographic priority is still preserved because
-       * ExperienceCatalogService already ordered the
-       * candidate list.
+       * Geographic priority is already
+       * preserved by the catalog's
+       * candidate ordering.
        */
-      if (evaluation.state === 'available') {
-        sameDateSuggestions.push(suggestion);
+      if (
+        evaluation.state ===
+        'available'
+      ) {
+        sameDateSuggestions.push(
+          suggestion,
+        );
       } else {
-        alternateDateSuggestions.push(suggestion);
+        alternateDateSuggestions.push(
+          suggestion,
+        );
       }
     }
 
     return [
       ...sameDateSuggestions,
+
       ...alternateDateSuggestions,
-    ].slice(0, 3);
+    ].slice(
+      0,
+      3,
+    );
   }
 
   private resolveExperience(
     title?: string,
   ): Experience | null {
-    if (!title?.trim()) {
+    if (
+      !title?.trim()
+    ) {
       return null;
     }
 
-    return this.experienceCatalogService.getByTitle(
-      title,
-    );
+    return this
+      .experienceCatalogService
+      .getByTitle(
+        title,
+      );
   }
 
   private createUnsupportedResult(
     request: SearchRequest,
   ): SearchResult {
     const requestedTitle =
-      request.experience?.trim() ||
+      request.experience
+        ?.trim() ||
       'Requested experience';
 
     return {
-      id: 'unsupported-experience',
+      id:
+        'unsupported-experience',
 
-      title: requestedTitle,
+      title:
+        requestedTitle,
 
-      city: request.city?.trim() ?? '',
+      city:
+        request.city
+          ?.trim() ?? '',
+
       location:
-        request.city?.trim() ??
+        request.city
+          ?.trim() ??
         'Experience not yet supported',
 
-      requestedDate: request.requestedDate,
+      requestedDate:
+        request.requestedDate,
 
       requestedTicketCount:
-        request.requestedTicketCount,
+        request
+          .requestedTicketCount,
 
-      state: 'unsupported-experience',
+      state:
+        'unsupported-experience',
 
       requestedDateSlots: [],
+
       alternateDates: [],
 
       errorMessage:
@@ -342,14 +512,24 @@ export class SearchResultsService {
     };
   }
 
-  private determineState(options: {
-    requestedDateSlots: AvailabilitySlot[];
-    alternateDates: AvailableDate[];
-    largestAvailableGroupSize: number;
-    requestedTicketCount: number;
-  }): Exclude<
+  private determineState(
+    options: {
+      requestedDateSlots:
+        AvailabilitySlot[];
+
+      alternateDates:
+        AvailableDate[];
+
+      largestAvailableGroupSize:
+        number;
+
+      requestedTicketCount:
+        number;
+    },
+  ): Exclude<
     SearchResultState,
-    'provider-error' | 'unsupported-experience'
+    | 'provider-error'
+    | 'unsupported-experience'
   > {
     const {
       requestedDateSlots,
@@ -358,16 +538,37 @@ export class SearchResultsService {
       requestedTicketCount,
     } = options;
 
-    if (requestedDateSlots.length > 0) {
+    /*
+     * Best case:
+     * the requested date itself works.
+     */
+    if (
+      requestedDateSlots.length >
+      0
+    ) {
       return 'available';
     }
 
-    if (alternateDates.length > 0) {
+    /*
+     * Requested date does not work,
+     * but another date can accommodate
+     * the entire group.
+     */
+    if (
+      alternateDates.length >
+      0
+    ) {
       return 'alternate-dates';
     }
 
+    /*
+     * Inventory exists, but nowhere in
+     * the provider result can fit the
+     * requested number of travellers.
+     */
     if (
-      largestAvailableGroupSize > 0 &&
+      largestAvailableGroupSize >
+        0 &&
       largestAvailableGroupSize <
         requestedTicketCount
     ) {
@@ -377,50 +578,95 @@ export class SearchResultsService {
     return 'no-availability';
   }
 
-  private createResult(options: {
-    experience: Experience;
-    request: SearchRequest;
-    evaluation: ExperienceEvaluation;
-    errorMessage?: string;
-    suggestedExperiences?: SuggestedExperience[];
-  }): SearchResult {
+  private createResult(
+    options: {
+      experience:
+        Experience;
+
+      request:
+        SearchRequest;
+
+      evaluation:
+        ExperienceEvaluation;
+
+      errorMessage?:
+        string;
+
+      suggestedExperiences?:
+        SuggestedExperience[];
+    },
+  ): SearchResult {
     return {
-      id: options.experience.id,
-      title: options.experience.title,
+      id:
+        options
+          .experience
+          .id,
 
-      city: options.experience.city,
-      location: options.experience.location,
+      title:
+        options
+          .experience
+          .title,
 
-      imageUrl: options.experience.imageUrl,
+      city:
+        options
+          .experience
+          .city,
+
+      location:
+        options
+          .experience
+          .location,
+
+      imageUrl:
+        options
+          .experience
+          .imageUrl,
 
       requestedDate:
-        options.evaluation.requestedDate,
+        options
+          .evaluation
+          .requestedDate,
 
       requestedTicketCount:
-        options.request.requestedTicketCount,
+        options
+          .request
+          .requestedTicketCount,
 
-      state: options.evaluation.state,
+      state:
+        options
+          .evaluation
+          .state,
 
       requestedDateSlots:
-        options.evaluation.requestedDateSlots,
+        options
+          .evaluation
+          .requestedDateSlots,
 
       alternateDates:
-        options.evaluation.alternateDates,
+        options
+          .evaluation
+          .alternateDates,
 
       largestAvailableGroupSize:
-        options.evaluation
+        options
+          .evaluation
           .largestAvailableGroupSize,
 
-      errorMessage: options.errorMessage,
+      errorMessage:
+        options.errorMessage,
 
       suggestedExperiences:
-        options.suggestedExperiences,
+        options
+          .suggestedExperiences,
     };
   }
 
   private filterBookableSlots(
-    slots: AvailabilitySlot[],
-    requestedTicketCount: number,
+    slots:
+      AvailabilitySlot[],
+
+    requestedTicketCount:
+      number,
   ): AvailabilitySlot[] {
     return slots.filter(
       (slot) =>
@@ -430,776 +676,20 @@ export class SearchResultsService {
   }
 
   private getLargestAvailableGroupSize(
-    slots: AvailabilitySlot[],
+    slots:
+      AvailabilitySlot[],
   ): number {
-    if (slots.length === 0) {
+    if (
+      slots.length === 0
+    ) {
       return 0;
     }
 
     return Math.max(
       ...slots.map(
-        (slot) => slot.availableTickets,
+        (slot) =>
+          slot.availableTickets,
       ),
     );
-  }
-
-  private getMockProviderAvailability(
-    requestedDate: string,
-    bookingUrl: string,
-    experienceId: string,
-  ): ProviderAvailability {
-    const normalizedDate =
-      this.normalizeDate(requestedDate);
-
-    /*
-     * Temporary deterministic provider-error test.
-     */
-    if (
-      normalizedDate.key ===
-      '1-january-2027'
-    ) {
-      return {
-        providerError: true,
-
-        requestedDate:
-          normalizedDate.displayDate,
-
-        requestedDateSlots: [],
-        alternateDates: [],
-      };
-    }
-
-    /*
-     * Temporary deterministic complete
-     * no-availability test.
-     */
-    if (
-      normalizedDate.key ===
-      '31-december-2026'
-    ) {
-      return {
-        providerError: false,
-
-        requestedDate:
-          normalizedDate.displayDate,
-
-        requestedDateSlots: [],
-        alternateDates: [],
-      };
-    }
-
-    const inventory =
-      this.createMockInventory(
-        bookingUrl,
-        experienceId,
-      );
-
-    return {
-      providerError: false,
-
-      requestedDate:
-        normalizedDate.displayDate,
-
-      requestedDateSlots:
-        inventory[normalizedDate.key] ?? [],
-
-      alternateDates:
-        this.getAlternateDates(
-          normalizedDate.key,
-          inventory,
-        ),
-    };
-  }
-
-  private createMockInventory(
-    bookingUrl: string,
-    experienceId: string,
-  ): Record<string, AvailabilitySlot[]> {
-    const template =
-      this.getMockInventoryTemplate(
-        experienceId,
-      );
-
-    const inventory: Record<
-      string,
-      AvailabilitySlot[]
-    > = {};
-
-    for (const day of template) {
-      const dateInfo =
-        this.createDateInfo(
-          this.getFutureDate(
-            day.daysFromToday,
-          ),
-        );
-
-      inventory[dateInfo.key] =
-        day.slots.map((slot, index) =>
-          this.createSlot(
-            `${experienceId}-${dateInfo.key}-${index}`,
-            slot.time,
-            slot.availableTickets,
-            slot.pricePerPerson,
-            bookingUrl,
-          ),
-        );
-    }
-
-    return inventory;
-  }
-
-  private getMockInventoryTemplate(
-    experienceId: string,
-  ): MockDayTemplate[] {
-    switch (experienceId) {
-      case 'uffizi-gallery':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '8:30 AM',
-                availableTickets: 4,
-                pricePerPerson: 25,
-              },
-              {
-                time: '10:45 AM',
-                availableTickets: 7,
-                pricePerPerson: 29,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '9:15 AM',
-                availableTickets: 5,
-                pricePerPerson: 25,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '11:30 AM',
-                availableTickets: 8,
-                pricePerPerson: 29,
-              },
-            ],
-          },
-        ];
-
-      case 'colosseum':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '9:00 AM',
-                availableTickets: 10,
-                pricePerPerson: 18,
-              },
-              {
-                time: '12:30 PM',
-                availableTickets: 6,
-                pricePerPerson: 22,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '10:00 AM',
-                availableTickets: 12,
-                pricePerPerson: 20,
-              },
-              {
-                time: '3:30 PM',
-                availableTickets: 4,
-                pricePerPerson: 24,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [
-              {
-                time: '11:00 AM',
-                availableTickets: 3,
-                pricePerPerson: 20,
-              },
-            ],
-          },
-          {
-            daysFromToday: 4,
-            slots: [],
-          },
-        ];
-
-      case 'pompeii':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '9:00 AM',
-                availableTickets: 8,
-                pricePerPerson: 20,
-              },
-              {
-                time: '11:30 AM',
-                availableTickets: 10,
-                pricePerPerson: 22,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '10:00 AM',
-                availableTickets: 6,
-                pricePerPerson: 20,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '1:00 PM',
-                availableTickets: 12,
-                pricePerPerson: 24,
-              },
-            ],
-          },
-        ];
-
-      /*
-       * Campania alternatives deliberately have larger
-       * capacities so a large Pompeii group can receive
-       * genuinely useful alternatives.
-       */
-      case 'herculaneum':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '9:30 AM',
-                availableTickets: 16,
-                pricePerPerson: 18,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '11:00 AM',
-                availableTickets: 18,
-                pricePerPerson: 20,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '2:00 PM',
-                availableTickets: 16,
-                pricePerPerson: 20,
-              },
-            ],
-          },
-        ];
-
-      case 'naples-archaeological-museum':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '10:00 AM',
-                availableTickets: 24,
-                pricePerPerson: 18,
-              },
-              {
-                time: '1:00 PM',
-                availableTickets: 22,
-                pricePerPerson: 18,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '11:00 AM',
-                availableTickets: 24,
-                pricePerPerson: 18,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '3:00 PM',
-                availableTickets: 20,
-                pricePerPerson: 18,
-              },
-            ],
-          },
-        ];
-
-      case 'mount-vesuvius':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '9:00 AM',
-                availableTickets: 30,
-                pricePerPerson: 15,
-              },
-              {
-                time: '12:00 PM',
-                availableTickets: 26,
-                pricePerPerson: 15,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '10:30 AM',
-                availableTickets: 28,
-                pricePerPerson: 15,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '2:30 PM',
-                availableTickets: 25,
-                pricePerPerson: 15,
-              },
-            ],
-          },
-        ];
-
-      case 'amalfi-coast':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '8:00 AM',
-                availableTickets: 25,
-                pricePerPerson: 45,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '9:00 AM',
-                availableTickets: 28,
-                pricePerPerson: 45,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '8:30 AM',
-                availableTickets: 25,
-                pricePerPerson: 48,
-              },
-            ],
-          },
-        ];
-
-      case 'accademia-gallery':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '8:45 AM',
-                availableTickets: 5,
-                pricePerPerson: 18,
-              },
-              {
-                time: '11:00 AM',
-                availableTickets: 7,
-                pricePerPerson: 22,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '9:30 AM',
-                availableTickets: 6,
-                pricePerPerson: 20,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '2:30 PM',
-                availableTickets: 8,
-                pricePerPerson: 22,
-              },
-            ],
-          },
-        ];
-
-      case 'borghese-gallery':
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '9:00 AM',
-                availableTickets: 4,
-                pricePerPerson: 17,
-              },
-              {
-                time: '1:00 PM',
-                availableTickets: 6,
-                pricePerPerson: 20,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '11:00 AM',
-                availableTickets: 5,
-                pricePerPerson: 19,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '3:00 PM',
-                availableTickets: 8,
-                pricePerPerson: 21,
-              },
-            ],
-          },
-        ];
-
-      default:
-        return [
-          {
-            daysFromToday: 1,
-            slots: [
-              {
-                time: '9:00 AM',
-                availableTickets: 5,
-                pricePerPerson: 20,
-              },
-              {
-                time: '11:00 AM',
-                availableTickets: 8,
-                pricePerPerson: 24,
-              },
-            ],
-          },
-          {
-            daysFromToday: 2,
-            slots: [
-              {
-                time: '10:00 AM',
-                availableTickets: 10,
-                pricePerPerson: 22,
-              },
-            ],
-          },
-          {
-            daysFromToday: 3,
-            slots: [],
-          },
-          {
-            daysFromToday: 4,
-            slots: [
-              {
-                time: '12:00 PM',
-                availableTickets: 9,
-                pricePerPerson: 24,
-              },
-            ],
-          },
-        ];
-    }
-  }
-
-  private getAlternateDates(
-    requestedDateKey: string,
-    inventory: Record<
-      string,
-      AvailabilitySlot[]
-    >,
-  ): AvailableDate[] {
-    return Object.entries(inventory)
-      .filter(
-        ([dateKey, slots]) =>
-          dateKey !== requestedDateKey &&
-          slots.length > 0,
-      )
-      .map(([dateKey, slots]) => ({
-        date:
-          this.displayDateFromKey(dateKey),
-        slots,
-      }))
-      .slice(0, 3);
-  }
-
-  private displayDateFromKey(
-    dateKey: string,
-  ): string {
-    const [day, month, year] =
-      dateKey.split('-');
-
-    return `${Number(day)} ${
-      month.charAt(0).toUpperCase() +
-      month.slice(1)
-    } ${year}`;
-  }
-
-  private getFutureDate(
-    daysFromToday: number,
-  ): Date {
-    const date = new Date();
-
-    date.setHours(0, 0, 0, 0);
-
-    date.setDate(
-      date.getDate() + daysFromToday,
-    );
-
-    return date;
-  }
-
-  private createDateInfo(
-    date: Date,
-  ): NormalizedDate {
-    const day = date.getDate();
-
-    const month =
-      new Intl.DateTimeFormat('en-GB', {
-        month: 'long',
-      })
-        .format(date)
-        .toLowerCase();
-
-    const year = date.getFullYear();
-
-    return {
-      key: `${day}-${month}-${year}`,
-
-      displayDate:
-        new Intl.DateTimeFormat(
-          'en-GB',
-          {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          },
-        ).format(date),
-    };
-  }
-
-  private normalizeDate(
-    value: string,
-  ): NormalizedDate {
-    const normalizedValue = value
-      .trim()
-      .toLowerCase()
-      .replace(/,/g, '')
-      .replace(/\s+/g, ' ');
-
-    if (normalizedValue === 'today') {
-      return this.createDateInfo(
-        this.getFutureDate(0),
-      );
-    }
-
-    if (
-      normalizedValue === 'tomorrow'
-    ) {
-      return this.createDateInfo(
-        this.getFutureDate(1),
-      );
-    }
-
-    const monthNames: Record<
-      string,
-      string
-    > = {
-      jan: 'january',
-      january: 'january',
-      feb: 'february',
-      february: 'february',
-      mar: 'march',
-      march: 'march',
-      apr: 'april',
-      april: 'april',
-      may: 'may',
-      jun: 'june',
-      june: 'june',
-      jul: 'july',
-      july: 'july',
-      aug: 'august',
-      august: 'august',
-      sep: 'september',
-      september: 'september',
-      oct: 'october',
-      october: 'october',
-      nov: 'november',
-      november: 'november',
-      dec: 'december',
-      december: 'december',
-    };
-
-    const dayMonthMatch =
-      normalizedValue.match(
-        /^(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?$/,
-      );
-
-    const monthDayMatch =
-      normalizedValue.match(
-        /^([a-z]+)\s+(\d{1,2})(?:\s+(\d{4}))?$/,
-      );
-
-    let day: string;
-    let monthInput: string;
-    let year: string;
-
-    if (dayMonthMatch) {
-      day = dayMonthMatch[1];
-      monthInput = dayMonthMatch[2];
-
-      year =
-        dayMonthMatch[3] ??
-        String(
-          new Date().getFullYear(),
-        );
-    } else if (monthDayMatch) {
-      monthInput = monthDayMatch[1];
-      day = monthDayMatch[2];
-
-      year =
-        monthDayMatch[3] ??
-        String(
-          new Date().getFullYear(),
-        );
-    } else {
-      return {
-        key:
-          normalizedValue.replace(
-            /\s+/g,
-            '-',
-          ),
-
-        displayDate: value,
-      };
-    }
-
-    const month =
-      monthNames[monthInput];
-
-    if (!month) {
-      return {
-        key:
-          normalizedValue.replace(
-            /\s+/g,
-            '-',
-          ),
-
-        displayDate: value,
-      };
-    }
-
-    const normalizedDay =
-      String(Number(day));
-
-    const capitalizedMonth =
-      month.charAt(0).toUpperCase() +
-      month.slice(1);
-
-    return {
-      key:
-        `${normalizedDay}-${month}-${year}`,
-
-      displayDate:
-        `${normalizedDay} ${capitalizedMonth} ${year}`,
-    };
-  }
-
-  private createSlot(
-    id: string,
-    time: string,
-    availableTickets: number,
-    pricePerPerson: number,
-    bookingUrl: string,
-  ): AvailabilitySlot {
-    return {
-      id,
-      time,
-      availableTickets,
-      pricePerPerson,
-      bookingUrl,
-    };
   }
 }

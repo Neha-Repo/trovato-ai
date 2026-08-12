@@ -27,7 +27,9 @@ interface OllamaChatResponse {
 @Injectable()
 export class OllamaService {
   private readonly baseUrl = 'http://localhost:11434';
+
   private readonly model = 'llama3.2:1b';
+
   private readonly timeoutMilliseconds = 90_000;
 
   async extractSearch(messages: ChatMessage[]): Promise<ExtractedSearch> {
@@ -36,36 +38,61 @@ export class OllamaService {
         role: 'system',
         content: this.createSystemPrompt(),
       },
+
       ...messages.map((message) => ({
         role: message.sender,
+
         content: message.text,
       })),
     ];
 
     const content = await this.chat(ollamaMessages);
 
-    return this.parseExtractedSearch(content);
+    const extracted = this.parseExtractedSearch(content);
+
+    /*
+     * Temporary development log.
+     *
+     * This allows us to compare the raw
+     * Ollama extraction with the final
+     * deterministic + AI extraction in
+     * ChatService.
+     */
+    console.log('Ollama extraction:', extracted);
+
+    return extracted;
   }
 
   private async chat(messages: OllamaMessage[]): Promise<string> {
     const abortController = new AbortController();
 
-    const timeout = setTimeout(() => {
-      abortController.abort();
-    }, this.timeoutMilliseconds);
+    const timeout = setTimeout(
+      () => {
+        abortController.abort();
+      },
+
+      this.timeoutMilliseconds,
+    );
 
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
+
         headers: {
           'Content-Type': 'application/json',
         },
+
         signal: abortController.signal,
+
         body: JSON.stringify({
           model: this.model,
+
           messages,
+
           stream: false,
+
           format: 'json',
+
           options: {
             temperature: 0,
           },
@@ -81,6 +108,7 @@ export class OllamaService {
       }
 
       const data = (await response.json()) as OllamaChatResponse;
+
       const content = data.message?.content?.trim();
 
       if (!content) {
@@ -108,8 +136,11 @@ export class OllamaService {
 
     return {
       experience: this.readNullableString(parsed['experience']),
+
       city: this.readNullableString(parsed['city']),
+
       date: this.readNullableString(parsed['date']),
+
       travellers: this.readNullablePositiveInteger(parsed['travellers']),
     };
   }
@@ -117,14 +148,20 @@ export class OllamaService {
   private createSystemPrompt(): string {
     const currentDate = this.formatDate(new Date());
 
+    const tomorrow = new Date();
+
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const tomorrowDate = this.formatDate(tomorrow);
+
     return `
-You extract booking information from conversations.
+You extract travel booking information from conversations for Trovato AI.
 
 Today is ${currentDate}.
 
 Return ONLY valid JSON.
 
-Schema:
+The JSON schema is exactly:
 
 {
   "experience": string | null,
@@ -133,47 +170,100 @@ Schema:
   "travellers": number | null
 }
 
-Examples
-
-User:
-I want Vatican Museum tickets in Rome tomorrow for 3 people.
-
-Output:
-{
-  "experience":"Vatican Museums",
-  "city":"Rome",
-  "date":"${this.formatDate(new Date(Date.now() + 86400000))}",
-  "travellers":3
-}
-
-User:
-I'd like to visit the Vatican Museums in Rome on 6 August with my wife and two kids.
-
-Output:
-{
-  "experience":"Vatican Museums",
-  "city":"Rome",
-  "date":"6 August 2026",
-  "travellers":4
-}
-
-User:
-We're a family of five visiting Florence for a wine tour next Friday.
-
-Output:
-{
-  "experience":"Wine tour",
-  "city":"Florence",
-  "date":"next Friday",
-  "travellers":5
-}
-
-Rules
+IMPORTANT RULES
 
 - Use the entire conversation.
-- Do not invent information.
+- Extract only information that the user actually provided.
+- Do not invent an attraction.
+- Do not substitute one attraction for another.
+- Never default to Vatican Museums.
+- Never copy an attraction from an example unless the user actually mentioned it.
+- If the user says Pompeii, return Pompeii, not Vatican Museums.
+- If the user says Uffizi, return Uffizi Gallery.
+- If the user says Colosseum, return Colosseum.
+- If the user says Herculaneum, return Herculaneum Archaeological Park.
+- If an experience is not known with confidence, return the user's wording rather than replacing it with another attraction.
 - Missing values must be null.
-- Return ONLY JSON.
+- travellers must be a positive integer or null.
+- Return ONLY the JSON object.
+- Do not include markdown.
+- Do not include explanations.
+
+DATE RULES
+
+- Convert "today" to ${currentDate}.
+- Convert "tomorrow" to ${tomorrowDate}.
+- If the user gives a date without a year, use the current year unless the conversation clearly indicates another year.
+- Preserve a future date accurately.
+- Do not invent a date.
+
+EXPERIENCE EXAMPLES
+
+User:
+I need 3 tickets for the Colosseum in Rome tomorrow.
+
+Output:
+{
+  "experience": "Colosseum",
+  "city": "Rome",
+  "date": "${tomorrowDate}",
+  "travellers": 3
+}
+
+User:
+I need 20 tickets for Pompeii Archaeological Park in Pompeii tomorrow.
+
+Output:
+{
+  "experience": "Pompeii Archaeological Park",
+  "city": "Pompeii",
+  "date": "${tomorrowDate}",
+  "travellers": 20
+}
+
+User:
+Two adults want to visit the Uffizi Gallery in Florence on 18 August.
+
+Output:
+{
+  "experience": "Uffizi Gallery",
+  "city": "Florence",
+  "date": "18 August ${new Date().getFullYear()}",
+  "travellers": 2
+}
+
+User:
+We want Herculaneum on 21 September for 4 people.
+
+Output:
+{
+  "experience": "Herculaneum Archaeological Park",
+  "city": "Herculaneum",
+  "date": "21 September ${new Date().getFullYear()}",
+  "travellers": 4
+}
+
+User:
+We are visiting Florence next week.
+
+Output:
+{
+  "experience": null,
+  "city": "Florence",
+  "date": "next week",
+  "travellers": null
+}
+
+User:
+I want tickets for the Egyptian Museum in Turin for 2 people on 25 August.
+
+Output:
+{
+  "experience": "Egyptian Museum",
+  "city": "Turin",
+  "date": "25 August ${new Date().getFullYear()}",
+  "travellers": 2
+}
 `;
   }
 
