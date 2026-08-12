@@ -1,5 +1,6 @@
 import {
   Component,
+  OnInit,
 } from '@angular/core';
 import {
   Router,
@@ -43,9 +44,12 @@ type NotifySetupState =
   standalone: true,
   imports: [IonContent],
 })
-export class ResultsPage {
+export class ResultsPage implements OnInit {
   private readonly searchStorageKey =
     'trovato-active-search';
+
+  private readonly pendingNotifyStorageKey =
+    'trovato-pending-notify';
 
   readonly fallbackImageUrl =
     'data:image/svg+xml;charset=UTF-8,' +
@@ -130,6 +134,9 @@ export class ResultsPage {
   isRequestingPushPermission =
     false;
 
+  isAuthInitializing =
+    true;
+
   hasActiveNotification =
     false;
 
@@ -191,8 +198,26 @@ export class ResultsPage {
     this.selectedSlots =
       this.result
         .requestedDateSlots;
+  }
+
+  async ngOnInit():
+    Promise<void> {
+    await this.authService.initialize();
+
+    this.isAuthInitializing =
+      false;
 
     this.syncNotificationState();
+
+    if (
+      this.authService
+        .isAuthenticated() &&
+      this.hasPendingNotifyIntent()
+    ) {
+      this.clearPendingNotifyIntent();
+
+      this.continueNotifySetup();
+    }
   }
 
   get hasAlternateDates():
@@ -224,6 +249,10 @@ export class ResultsPage {
 
   get notificationButtonLabel():
     string {
+    if (this.isAuthInitializing) {
+      return 'Checking account…';
+    }
+
     return this.hasActiveNotification
       ? 'Notification active'
       : 'Notify me';
@@ -363,6 +392,12 @@ export class ResultsPage {
 
   notifyMe(): void {
     if (
+      this.isAuthInitializing
+    ) {
+      return;
+    }
+
+    if (
       this.hasActiveNotification
     ) {
       this.notifySetupState =
@@ -384,11 +419,21 @@ export class ResultsPage {
     this.continueNotifySetup();
   }
 
-  signInAndContinue():
-    void {
-    this.authService.signIn();
+  async signInAndContinue():
+    Promise<void> {
+    this.storePendingNotifyIntent();
 
-    this.continueNotifySetup();
+    try {
+      await this.authService
+        .signInWithGoogle();
+    } catch (error) {
+      console.error(
+        'Google sign-in failed',
+        error,
+      );
+
+      this.clearPendingNotifyIntent();
+    }
   }
 
   async enablePushNotifications():
@@ -604,6 +649,42 @@ export class ResultsPage {
           this.result
             .requestedTicketCount,
         );
+  }
+
+  private storePendingNotifyIntent():
+    void {
+    try {
+      sessionStorage.setItem(
+        this.pendingNotifyStorageKey,
+        'true',
+      );
+    } catch {
+      // Session storage is optional.
+    }
+  }
+
+  private hasPendingNotifyIntent():
+    boolean {
+    try {
+      return (
+        sessionStorage.getItem(
+          this.pendingNotifyStorageKey,
+        ) === 'true'
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private clearPendingNotifyIntent():
+    void {
+    try {
+      sessionStorage.removeItem(
+        this.pendingNotifyStorageKey,
+      );
+    } catch {
+      // Session storage is optional.
+    }
   }
 
   private storeSearch(

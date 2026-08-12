@@ -300,7 +300,8 @@
                 type="button"
                 class="secondary-button"
                 [disabled]="
-                  hasActiveNotification
+                  hasActiveNotification ||
+                  isAuthInitializing
                 "
                 (click)="notifyMe()"
               >
@@ -456,7 +457,8 @@
                 type="button"
                 class="primary-button"
                 [disabled]="
-                  hasActiveNotification
+                  hasActiveNotification ||
+                  isAuthInitializing
                 "
                 (click)="notifyMe()"
               >
@@ -711,7 +713,8 @@
                 type="button"
                 class="primary-button"
                 [disabled]="
-                  hasActiveNotification
+                  hasActiveNotification ||
+                  isAuthInitializing
                 "
                 (click)="notifyMe()"
               >
@@ -1016,176 +1019,236 @@
         </section>
       }
     }
+  </main>
 
-    @if (notifySetupState) {
+  @if (notifySetupState) {
+    <div
+      class="notify-modal-backdrop"
+      role="presentation"
+    >
       <section
-        class="result-section"
-        aria-live="polite"
+        class="notify-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="notify-modal-title"
+        aria-describedby="notify-modal-description"
       >
-        <article class="message-card">
+        <button
+          type="button"
+          class="notify-modal-close"
+          aria-label="Close"
+          (click)="closeNotifySetup()"
+        >
+          ×
+        </button>
+
+        <div
+          class="notify-modal-icon"
+          aria-hidden="true"
+        >
           @switch (notifySetupState) {
             @case ('auth') {
-              <p class="section-kicker">
-                Sign in required
-              </p>
-
-              <h2>
-                Sign in to save this availability alert
-              </h2>
-
-              <p>
-                Your alert needs to be linked to your
-                Trovato account so we know which device
-                to notify when matching availability
-                appears.
-              </p>
-
-              <div class="message-actions">
-                <button
-                  type="button"
-                  class="primary-button"
-                  (click)="signInAndContinue()"
-                >
-                  Sign in and continue
-                </button>
-
-                <button
-                  type="button"
-                  class="secondary-button"
-                  (click)="closeNotifySetup()"
-                >
-                  Not now
-                </button>
-              </div>
+              👤
             }
 
             @case ('permission') {
-              <p class="section-kicker">
-                Push notifications
-              </p>
-
-              <h2>
-                Allow Trovato to notify you
-              </h2>
-
-              <p>
-                We will only use push notifications
-                for availability alerts you choose to
-                activate.
-              </p>
-
-              <div class="message-actions">
-                <button
-                  type="button"
-                  class="primary-button"
-                  [disabled]="
-                    isRequestingPushPermission
-                  "
-                  (click)="
-                    enablePushNotifications()
-                  "
-                >
-                  @if (
-                    isRequestingPushPermission
-                  ) {
-                    Requesting permission…
-                  } @else {
-                    Enable notifications
-                  }
-                </button>
-
-                <button
-                  type="button"
-                  class="secondary-button"
-                  (click)="closeNotifySetup()"
-                >
-                  Not now
-                </button>
-              </div>
+              🔔
             }
 
             @case ('denied') {
-              <p class="section-kicker">
-                Notifications blocked
-              </p>
-
-              <h2>
-                Push notifications are disabled
-              </h2>
-
-              <p>
-                Enable notifications for Trovato in
-                your browser or device settings, then
-                return here and try again.
-              </p>
-
-              <button
-                type="button"
-                class="secondary-button"
-                (click)="closeNotifySetup()"
-              >
-                Close
-              </button>
+              🔕
             }
 
             @case ('unsupported') {
-              <p class="section-kicker">
-                Notifications unavailable
-              </p>
+              !
+            }
 
-              <h2>
-                Push notifications are not supported
-                here
-              </h2>
+            @case ('active') {
+              ✓
+            }
+          }
+        </div>
 
-              <p>
-                This browser or environment does not
-                currently support the notification
-                permission needed for availability
-                alerts.
-              </p>
+        @switch (notifySetupState) {
+          @case ('auth') {
+            <p class="section-kicker">
+              Sign in required
+            </p>
+
+            <h2 id="notify-modal-title">
+              Sign in to save this availability alert
+            </h2>
+
+            <p
+              id="notify-modal-description"
+              class="notify-modal-description"
+            >
+              Your alert needs to be linked to your
+              Trovato account so we can notify you when
+              matching availability appears.
+            </p>
+
+            <div class="notify-modal-actions">
+              <button
+                type="button"
+                class="primary-button"
+                (click)="signInAndContinue()"
+              >
+                Continue with Google
+              </button>
 
               <button
                 type="button"
                 class="secondary-button"
                 (click)="closeNotifySetup()"
               >
-                Close
+                Not now
               </button>
-            }
+            </div>
+          }
 
-            @case ('active') {
-              <p class="section-kicker">
-                Alert active
-              </p>
+          @case ('permission') {
+            <p class="section-kicker">
+              Push notifications
+            </p>
 
-              <h2>
-                We’ll watch this availability
-              </h2>
+            <h2 id="notify-modal-title">
+              Allow Trovato to notify you
+            </h2>
 
-              <p>
-                Trovato will watch
-                {{ result.title }} for
+            <p
+              id="notify-modal-description"
+              class="notify-modal-description"
+            >
+              Trovato will use push notifications only
+              for availability alerts you choose to
+              activate.
+            </p>
+
+            <div class="notify-modal-actions">
+              <button
+                type="button"
+                class="primary-button"
+                [disabled]="
+                  isRequestingPushPermission
+                "
+                (click)="
+                  enablePushNotifications()
+                "
+              >
+                @if (
+                  isRequestingPushPermission
+                ) {
+                  Requesting permission…
+                } @else {
+                  Enable notifications
+                }
+              </button>
+
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="closeNotifySetup()"
+              >
+                Not now
+              </button>
+            </div>
+          }
+
+          @case ('denied') {
+            <p class="section-kicker">
+              Notifications blocked
+            </p>
+
+            <h2 id="notify-modal-title">
+              Push notifications are disabled
+            </h2>
+
+            <p
+              id="notify-modal-description"
+              class="notify-modal-description"
+            >
+              Enable notifications for Trovato in your
+              browser or device settings, then return
+              here and try again.
+            </p>
+
+            <button
+              type="button"
+              class="secondary-button"
+              (click)="closeNotifySetup()"
+            >
+              Close
+            </button>
+          }
+
+          @case ('unsupported') {
+            <p class="section-kicker">
+              Notifications unavailable
+            </p>
+
+            <h2 id="notify-modal-title">
+              Push notifications are not supported here
+            </h2>
+
+            <p
+              id="notify-modal-description"
+              class="notify-modal-description"
+            >
+              This browser or environment does not
+              support the notification permission
+              needed for availability alerts.
+            </p>
+
+            <button
+              type="button"
+              class="secondary-button"
+              (click)="closeNotifySetup()"
+            >
+              Close
+            </button>
+          }
+
+          @case ('active') {
+            <p class="section-kicker">
+              Alert active
+            </p>
+
+            <h2 id="notify-modal-title">
+              We’ll watch this availability
+            </h2>
+
+            <p
+              id="notify-modal-description"
+              class="notify-modal-description"
+            >
+              Trovato will watch
+              <strong>{{ result.title }}</strong>
+              for
+              <strong>
                 {{ result.requestedTicketCount }}
                 {{
                   result.requestedTicketCount === 1
                     ? 'traveller'
                     : 'travellers'
                 }}
-                on {{ result.requestedDate }}.
-              </p>
+              </strong>
+              on
+              <strong>
+                {{ result.requestedDate }}
+              </strong>.
+            </p>
 
-              <button
-                type="button"
-                class="primary-button"
-                (click)="closeNotifySetup()"
-              >
-                Done
-              </button>
-            }
+            <button
+              type="button"
+              class="primary-button"
+              (click)="closeNotifySetup()"
+            >
+              Done
+            </button>
           }
-        </article>
+        }
       </section>
-    }
-  </main>
+    </div>
+  }
 </ion-content>

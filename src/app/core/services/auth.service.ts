@@ -1,79 +1,113 @@
 import { Injectable } from '@angular/core';
+import {
+  AuthChangeEvent,
+  Session,
+  User,
+} from '@supabase/supabase-js';
 
-export interface AuthUser {
-  id: string;
-  displayName: string;
-}
+import { SupabaseService } from './supabase.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
-  private readonly storageKey = 'trovato-auth-user';
+  private session: Session | null = null;
 
-  private currentUser: AuthUser | null =
-    this.readStoredUser();
+  private initialized = false;
+
+  constructor(
+    private readonly supabaseService: SupabaseService,
+  ) {}
+
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    const {
+      data,
+      error,
+    } =
+      await this.supabaseService.client.auth.getSession();
+
+    if (error) {
+      console.error(
+        'Failed to restore Supabase session',
+        error,
+      );
+    }
+
+    this.session = data.session;
+
+    this.supabaseService.client.auth.onAuthStateChange(
+      (
+        _event: AuthChangeEvent,
+        session: Session | null,
+      ) => {
+        this.session = session;
+      },
+    );
+
+    this.initialized = true;
+  }
 
   isAuthenticated(): boolean {
-    return this.currentUser !== null;
+    return this.session !== null;
   }
 
-  getCurrentUser(): AuthUser | null {
-    return this.currentUser;
+  getCurrentUser(): User | null {
+    return this.session?.user ?? null;
   }
 
-  signIn(): AuthUser {
-    if (this.currentUser) {
-      return this.currentUser;
-    }
+  getAccessToken(): string | null {
+    return (
+      this.session?.access_token ??
+      null
+    );
+  }
 
-    const user: AuthUser = {
-      id: crypto.randomUUID(),
-      displayName: 'Traveller',
-    };
+  async signInWithGoogle(): Promise<void> {
+    const redirectTo =
+      `${window.location.origin}/results`;
 
-    this.currentUser = user;
-
-    try {
-      localStorage.setItem(
-        this.storageKey,
-        JSON.stringify(user),
+    const {
+      error,
+    } =
+      await this.supabaseService.client.auth.signInWithOAuth(
+        {
+          provider: 'google',
+          options: {
+            redirectTo,
+          },
+        },
       );
-    } catch {
-      // Local storage is optional.
-    }
 
-    return user;
-  }
-
-  signOut(): void {
-    this.currentUser = null;
-
-    try {
-      localStorage.removeItem(
-        this.storageKey,
-      );
-    } catch {
-      // Local storage is optional.
+    if (error) {
+      throw error;
     }
   }
 
-  private readStoredUser(): AuthUser | null {
-    try {
-      const value =
-        localStorage.getItem(
-          this.storageKey,
-        );
+  /*
+   * Temporary compatibility bridge.
+   *
+   * ResultsPage still calls signIn().
+   * In the upcoming OAuth wiring step we will replace
+   * that Results flow properly and remove this method.
+   */
+  signIn(): void {
+    void this.signInWithGoogle();
+  }
 
-      if (!value) {
-        return null;
-      }
+  async signOut(): Promise<void> {
+    const {
+      error,
+    } =
+      await this.supabaseService.client.auth.signOut();
 
-      return JSON.parse(
-        value,
-      ) as AuthUser;
-    } catch {
-      return null;
+    if (error) {
+      throw error;
     }
+
+    this.session = null;
   }
 }
