@@ -23,6 +23,7 @@ import {
 import {
   ChatService,
 } from '../../services/chat.service';
+import { MenuButtonComponent } from '../../../../shared/components/menu-button/menu-button.component';
 
 @Component({
   selector: 'app-chat',
@@ -32,6 +33,7 @@ import {
   imports: [
     IonContent,
     FormsModule,
+    MenuButtonComponent,
   ],
 })
 export class ChatPage {

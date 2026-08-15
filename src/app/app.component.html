@@ -1,3 +1,73 @@
 <ion-app>
-  <ion-router-outlet />
+  <ion-menu
+    contentId="main-content"
+    type="overlay"
+  >
+    <ion-content>
+      <section class="menu-header">
+        <p class="menu-kicker">
+          Trovato AI
+        </p>
+
+        <h2>
+          Explore Italy
+        </h2>
+      </section>
+
+      <ion-list
+        class="menu-list"
+        lines="none"
+      >
+        <ion-menu-toggle
+          autoHide="true"
+        >
+          <ion-item
+            button
+            detail="false"
+            (click)="
+              navigateTo('/chat')
+            "
+          >
+            <ion-label>
+              Chat / Search
+            </ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+
+        <ion-menu-toggle
+  autoHide="true"
+>
+  <ion-item
+    button
+    detail="false"
+    (click)="
+      navigateTo('/alerts')
+    "
+  >
+    <ion-label>
+      My Alerts
+    </ion-label>
+  </ion-item>
+</ion-menu-toggle>
+
+        <ion-menu-toggle
+          autoHide="true"
+        >
+          <ion-item
+            button
+            detail="false"
+            disabled
+          >
+            <ion-label>
+              Account
+            </ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+      </ion-list>
+    </ion-content>
+  </ion-menu>
+
+  <ion-router-outlet
+    id="main-content"
+  />
 </ion-app>

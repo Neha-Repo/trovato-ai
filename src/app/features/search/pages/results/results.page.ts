@@ -28,6 +28,7 @@ import {
 import {
   SearchResultsService,
 } from '../../services/search-results.service';
+import { MenuButtonComponent } from '../../../../shared/components/menu-button/menu-button.component';
 
 type NotifySetupState =
   | 'auth'
@@ -42,7 +43,7 @@ type NotifySetupState =
   templateUrl: './results.page.html',
   styleUrls: ['./results.page.scss'],
   standalone: true,
-  imports: [IonContent],
+  imports: [IonContent,MenuButtonComponent,],
 })
 export class ResultsPage implements OnInit {
   private readonly searchStorageKey =

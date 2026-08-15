@@ -1,0 +1,128 @@
+<ion-content [fullscreen]="true">
+  <div class="page-menu-trigger">
+    <app-menu-button />
+  </div>
+
+  <main class="alerts-page">
+    <section class="alerts-header">
+      <p class="eyebrow">
+        Trovato AI
+      </p>
+
+      <h1>
+        My Alerts
+      </h1>
+
+      <p>
+        We'll keep track of the experiences
+        you're waiting for.
+      </p>
+    </section>
+
+    @if (isLoading) {
+      <section class="state-card">
+        <p>
+          Loading your alerts…
+        </p>
+      </section>
+    } @else if (errorMessage) {
+      <section
+        class="state-card error-card"
+      >
+        <p>
+          {{ errorMessage }}
+        </p>
+      </section>
+    } @else if (watches.length === 0) {
+      <section class="state-card">
+        <h2>
+          No active alerts
+        </h2>
+
+        <p>
+          When an experience is unavailable,
+          choose Notify me and it will appear
+          here.
+        </p>
+
+        <button
+          type="button"
+          class="primary-button"
+          (click)="goToChat()"
+        >
+          Search experiences
+        </button>
+      </section>
+    } @else {
+      <section class="alerts-list">
+        @for (
+          watch of watches;
+          track watch.id
+        ) {
+          <article class="alert-card">
+            <div class="alert-card-top">
+              <div>
+                <p class="status">
+                  Active
+                </p>
+
+                <h2>
+                  {{
+                    watch.experienceTitle
+                  }}
+                </h2>
+              </div>
+            </div>
+
+            <div class="alert-details">
+              <p>
+                <span>
+                  Date
+                </span>
+
+                <strong>
+                  {{
+                    formatDate(
+                      watch.requestedDate
+                    )
+                  }}
+                </strong>
+              </p>
+
+              <p>
+                <span>
+                  Travellers
+                </span>
+
+                <strong>
+                  {{ watch.travellers }}
+                </strong>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="cancel-button"
+              [disabled]="
+                cancellingWatchId ===
+                watch.id
+              "
+              (click)="
+                cancelWatch(watch)
+              "
+            >
+              @if (
+                cancellingWatchId ===
+                watch.id
+              ) {
+                Cancelling…
+              } @else {
+                Cancel alert
+              }
+            </button>
+          </article>
+        }
+      </section>
+    }
+  </main>
+</ion-content>
