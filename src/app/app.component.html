@@ -50,19 +50,21 @@
   </ion-item>
 </ion-menu-toggle>
 
-        <ion-menu-toggle
-          autoHide="true"
-        >
-          <ion-item
-            button
-            detail="false"
-            disabled
-          >
-            <ion-label>
-              Account
-            </ion-label>
-          </ion-item>
-        </ion-menu-toggle>
+       <ion-menu-toggle
+  autoHide="true"
+>
+  <ion-item
+    button
+    detail="false"
+    (click)="
+      navigateTo('/account')
+    "
+  >
+    <ion-label>
+      Account
+    </ion-label>
+  </ion-item>
+</ion-menu-toggle>
       </ion-list>
     </ion-content>
   </ion-menu>

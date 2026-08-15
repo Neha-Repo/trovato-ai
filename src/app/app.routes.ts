@@ -46,6 +46,15 @@ export const routes: Routes = [
       (m) => m.MyAlertsPage,
     ),
 },
+{
+  path: 'account',
+  loadComponent: () =>
+    import(
+      './features/account/pages/account/account.page'
+    ).then(
+      (m) => m.AccountPage,
+    ),
+},
   {
     path: '',
     redirectTo: 'home',

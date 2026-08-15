@@ -1,0 +1,89 @@
+<ion-content [fullscreen]="true">
+  <div class="page-menu-trigger">
+    <app-menu-button />
+  </div>
+
+  <main class="account-page">
+    <section class="account-header">
+      <p class="eyebrow">
+        Trovato AI
+      </p>
+
+      <h1>
+        Account
+      </h1>
+
+      <p>
+        Manage your Trovato account.
+      </p>
+    </section>
+
+    @if (isLoading) {
+      <section class="account-card">
+        <p>
+          Loading your account…
+        </p>
+      </section>
+    } @else if (user) {
+      <section class="account-card">
+        <div class="avatar">
+          {{
+            displayName
+              .charAt(0)
+              .toUpperCase()
+          }}
+        </div>
+
+        <div class="identity">
+          <h2>
+            {{ displayName }}
+          </h2>
+
+          @if (email) {
+            <p>
+              {{ email }}
+            </p>
+          }
+        </div>
+
+        @if (errorMessage) {
+          <p class="error-message">
+            {{ errorMessage }}
+          </p>
+        }
+
+        <button
+          type="button"
+          class="sign-out-button"
+          [disabled]="isSigningOut"
+          (click)="signOut()"
+        >
+          @if (isSigningOut) {
+            Signing out…
+          } @else {
+            Sign out
+          }
+        </button>
+      </section>
+    } @else {
+      <section class="account-card">
+        <h2>
+          You're not signed in
+        </h2>
+
+        <p>
+          Sign in to manage your alerts
+          across your devices.
+        </p>
+
+        <button
+          type="button"
+          class="primary-button"
+          (click)="signIn()"
+        >
+          Sign in with Google
+        </button>
+      </section>
+    }
+  </main>
+</ion-content>
