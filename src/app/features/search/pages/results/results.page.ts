@@ -207,7 +207,7 @@ export class ResultsPage implements OnInit {
     this.isAuthInitializing =
       false;
 
-    this.syncNotificationState();
+    await this.syncNotificationState();
 
     if (
       this.authService
@@ -360,7 +360,7 @@ export class ResultsPage implements OnInit {
     this.notifySetupState =
       null;
 
-    this.syncNotificationState();
+    void this.syncNotificationState();
 
     window.scrollTo({
       top: 0,
@@ -520,7 +520,7 @@ export class ResultsPage implements OnInit {
       nextResult
         .requestedDateSlots;
 
-    this.syncNotificationState();
+    void this.syncNotificationState();
   }
 
   changeSearch(): void {
@@ -568,7 +568,7 @@ export class ResultsPage implements OnInit {
   ): void {
     switch (permission) {
       case 'granted':
-        this.activateNotification();
+        void this.activateNotification();
         return;
 
       case 'default':
@@ -588,20 +588,21 @@ export class ResultsPage implements OnInit {
     }
   }
 
-  private activateNotification():
-    void {
-    const user =
-      this.authService
-        .getCurrentUser();
+  private async activateNotification():
+  Promise<void> {
+  const user =
+    this.authService
+      .getCurrentUser();
 
-    if (!user) {
-      this.notifySetupState =
-        'auth';
+  if (!user) {
+    this.notifySetupState =
+      'auth';
 
-      return;
-    }
+    return;
+  }
 
-    this.notificationWatchService
+  try {
+    await this.notificationWatchService
       .createWatch({
         userId: user.id,
 
@@ -625,23 +626,36 @@ export class ResultsPage implements OnInit {
 
     this.notifySetupState =
       'active';
-  }
-
-  private syncNotificationState():
-    void {
-    const user =
-      this.authService
-        .getCurrentUser();
-
-    if (!user) {
-      this.hasActiveNotification =
-        false;
-
-      return;
-    }
+  } catch (error) {
+    console.error(
+      'Could not create availability watch',
+      error,
+    );
 
     this.hasActiveNotification =
-      this.notificationWatchService
+      false;
+
+    this.notifySetupState =
+      null;
+  }
+}
+
+  private async syncNotificationState():
+  Promise<void> {
+  const user =
+    this.authService
+      .getCurrentUser();
+
+  if (!user) {
+    this.hasActiveNotification =
+      false;
+
+    return;
+  }
+
+  try {
+    this.hasActiveNotification =
+      await this.notificationWatchService
         .hasActiveWatch(
           user.id,
           this.result.id,
@@ -649,7 +663,16 @@ export class ResultsPage implements OnInit {
           this.result
             .requestedTicketCount,
         );
+  } catch (error) {
+    console.error(
+      'Could not load availability watch',
+      error,
+    );
+
+    this.hasActiveNotification =
+      false;
   }
+}
 
   private storePendingNotifyIntent():
     void {

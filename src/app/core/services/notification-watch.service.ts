@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 
+import { SupabaseService } from './supabase.service';
+
 export type PushPermissionStatus =
   | 'granted'
   | 'denied'
@@ -25,6 +27,24 @@ export interface AvailabilityWatch {
   status: AvailabilityWatchStatus;
 
   createdAt: string;
+  updatedAt: string;
+}
+
+interface AvailabilityWatchRow {
+  id: string;
+
+  user_id: string;
+
+  experience_id: string;
+  experience_title: string;
+
+  requested_date: string;
+  travellers: number;
+
+  status: AvailabilityWatchStatus;
+
+  created_at: string;
+  updated_at: string;
 }
 
 interface CreateAvailabilityWatch {
@@ -41,8 +61,10 @@ interface CreateAvailabilityWatch {
   providedIn: 'root',
 })
 export class NotificationWatchService {
-  private readonly storageKey =
-    'trovato-availability-watches';
+  constructor(
+    private readonly supabaseService:
+      SupabaseService,
+  ) {}
 
   getPushPermissionStatus():
     PushPermissionStatus {
@@ -60,17 +82,18 @@ export class NotificationWatchService {
     }
 
     try {
-      return await Notification.requestPermission();
+      return await Notification
+        .requestPermission();
     } catch {
       return 'denied';
     }
   }
 
-  createWatch(
+  async createWatch(
     input: CreateAvailabilityWatch,
-  ): AvailabilityWatch {
+  ): Promise<AvailabilityWatch> {
     const existing =
-      this.findActiveWatch(
+      await this.findActiveWatch(
         input.userId,
         input.experienceId,
         input.requestedDate,
@@ -81,139 +104,248 @@ export class NotificationWatchService {
       return existing;
     }
 
-    const watch: AvailabilityWatch = {
-      id: crypto.randomUUID(),
+    const {
+      data,
+      error,
+    } =
+      await this.supabaseService.client
+        .from('availability_watches')
+        .insert({
+          user_id:
+            input.userId,
 
-      userId: input.userId,
+          experience_id:
+            input.experienceId,
 
-      experienceId:
-        input.experienceId,
+          experience_title:
+            input.experienceTitle,
 
-      experienceTitle:
-        input.experienceTitle,
+          requested_date:
+            input.requestedDate,
 
-      requestedDate:
-        input.requestedDate,
+          travellers:
+            input.travellers,
 
-      travellers:
-        input.travellers,
+          status:
+            'active',
+        })
+        .select()
+        .single();
 
-      status: 'active',
+    if (error) {
+      /*
+       * Another request could have created the
+       * same active watch between our lookup
+       * and insert. Try reading it once more
+       * before treating the operation as failed.
+       */
+      const existingAfterInsert =
+        await this.findActiveWatch(
+          input.userId,
+          input.experienceId,
+          input.requestedDate,
+          input.travellers,
+        );
 
-      createdAt:
-        new Date().toISOString(),
-    };
+      if (existingAfterInsert) {
+        return existingAfterInsert;
+      }
 
-    const watches =
-      this.readWatches();
+      throw new Error(
+        `Could not create availability watch: ${error.message}`,
+      );
+    }
 
-    watches.push(watch);
-
-    this.writeWatches(watches);
-
-    return watch;
+    return this.mapRow(
+      data as AvailabilityWatchRow,
+    );
   }
 
-  hasActiveWatch(
+  async hasActiveWatch(
     userId: string,
     experienceId: string,
     requestedDate: string,
     travellers: number,
-  ): boolean {
-    return (
-      this.findActiveWatch(
+  ): Promise<boolean> {
+    const watch =
+      await this.findActiveWatch(
         userId,
         experienceId,
         requestedDate,
         travellers,
-      ) !== null
-    );
+      );
+
+    return watch !== null;
   }
 
-  cancelWatch(
+  async cancelWatch(
     userId: string,
     experienceId: string,
     requestedDate: string,
     travellers: number,
-  ): void {
-    const watches =
-      this.readWatches();
+  ): Promise<void> {
+    const {
+      error,
+    } =
+      await this.supabaseService.client
+        .from('availability_watches')
+        .update({
+          status:
+            'cancelled',
 
-    const updated =
-      watches.map((watch) => {
-        const matches =
-          watch.userId === userId &&
-          watch.experienceId ===
-            experienceId &&
-          watch.requestedDate ===
-            requestedDate &&
-          watch.travellers ===
-            travellers &&
-          watch.status === 'active';
-
-        return matches
-          ? {
-              ...watch,
-              status:
-                'cancelled' as const,
-            }
-          : watch;
-      });
-
-    this.writeWatches(updated);
-  }
-
-  private findActiveWatch(
-    userId: string,
-    experienceId: string,
-    requestedDate: string,
-    travellers: number,
-  ): AvailabilityWatch | null {
-    return (
-      this.readWatches().find(
-        (watch) =>
-          watch.userId === userId &&
-          watch.experienceId ===
-            experienceId &&
-          watch.requestedDate ===
-            requestedDate &&
-          watch.travellers ===
-            travellers &&
-          watch.status === 'active',
-      ) ?? null
-    );
-  }
-
-  private readWatches():
-    AvailabilityWatch[] {
-    try {
-      const value =
-        localStorage.getItem(
-          this.storageKey,
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq(
+          'user_id',
+          userId,
+        )
+        .eq(
+          'experience_id',
+          experienceId,
+        )
+        .eq(
+          'requested_date',
+          requestedDate,
+        )
+        .eq(
+          'travellers',
+          travellers,
+        )
+        .eq(
+          'status',
+          'active',
         );
 
-      if (!value) {
-        return [];
-      }
-
-      return JSON.parse(
-        value,
-      ) as AvailabilityWatch[];
-    } catch {
-      return [];
+    if (error) {
+      throw new Error(
+        `Could not cancel availability watch: ${error.message}`,
+      );
     }
   }
 
-  private writeWatches(
-    watches: AvailabilityWatch[],
-  ): void {
-    try {
-      localStorage.setItem(
-        this.storageKey,
-        JSON.stringify(watches),
+  async getActiveWatches(
+    userId: string,
+  ): Promise<AvailabilityWatch[]> {
+    const {
+      data,
+      error,
+    } =
+      await this.supabaseService.client
+        .from('availability_watches')
+        .select('*')
+        .eq(
+          'user_id',
+          userId,
+        )
+        .eq(
+          'status',
+          'active',
+        )
+        .order(
+          'created_at',
+          {
+            ascending: false,
+          },
+        );
+
+    if (error) {
+      throw new Error(
+        `Could not load availability watches: ${error.message}`,
       );
-    } catch {
-      // Local storage is optional.
     }
+
+    return (
+      (
+        data ??
+        []
+      ) as AvailabilityWatchRow[]
+    ).map(
+      (row) =>
+        this.mapRow(row),
+    );
+  }
+
+  private async findActiveWatch(
+    userId: string,
+    experienceId: string,
+    requestedDate: string,
+    travellers: number,
+  ): Promise<AvailabilityWatch | null> {
+    const {
+      data,
+      error,
+    } =
+      await this.supabaseService.client
+        .from('availability_watches')
+        .select('*')
+        .eq(
+          'user_id',
+          userId,
+        )
+        .eq(
+          'experience_id',
+          experienceId,
+        )
+        .eq(
+          'requested_date',
+          requestedDate,
+        )
+        .eq(
+          'travellers',
+          travellers,
+        )
+        .eq(
+          'status',
+          'active',
+        )
+        .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Could not load availability watch: ${error.message}`,
+      );
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return this.mapRow(
+      data as AvailabilityWatchRow,
+    );
+  }
+
+  private mapRow(
+    row: AvailabilityWatchRow,
+  ): AvailabilityWatch {
+    return {
+      id:
+        row.id,
+
+      userId:
+        row.user_id,
+
+      experienceId:
+        row.experience_id,
+
+      experienceTitle:
+        row.experience_title,
+
+      requestedDate:
+        row.requested_date,
+
+      travellers:
+        row.travellers,
+
+      status:
+        row.status,
+
+      createdAt:
+        row.created_at,
+
+      updatedAt:
+        row.updated_at,
+    };
   }
 }
