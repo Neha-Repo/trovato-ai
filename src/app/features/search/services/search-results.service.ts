@@ -8,12 +8,12 @@ import {
   SuggestedExperience,
 } from '../models/search-result.model';
 import {
-  AvailabilityProviderService,
-} from '../providers/availability-provider.service';
-import {
   Experience,
   ExperienceCatalogService,
 } from './experience-catalog.service';
+import {
+  AvailabilityApiService,
+} from './availability-api.service';
 
 interface SearchRequest {
   experience?: string;
@@ -44,43 +44,51 @@ interface ExperienceEvaluation {
 export class SearchResultsService {
   private readonly defaultRequest:
     SearchRequest = {
-      experience: 'Vatican Museums',
-      city: 'Rome',
-      requestedDate: 'tomorrow',
-      requestedTicketCount: 3,
+      experience:
+        'Vatican Museums',
+
+      city:
+        'Rome',
+
+      requestedDate:
+        'tomorrow',
+
+      requestedTicketCount:
+        3,
     };
 
   constructor(
     private readonly experienceCatalogService:
       ExperienceCatalogService,
 
-    private readonly availabilityProviderService:
-      AvailabilityProviderService,
+    private readonly availabilityApiService:
+      AvailabilityApiService,
   ) {}
 
-  search(
+  async search(
     request:
       SearchRequest =
         this.defaultRequest,
-  ): SearchResult {
+  ): Promise<SearchResult> {
     const experience =
       this.resolveExperience(
         request.experience,
       );
 
     if (!experience) {
-      return this.createUnsupportedResult(
-        request,
-      );
+      return this
+        .createUnsupportedResult(
+          request,
+        );
     }
 
     /*
-     * The experience catalog owns the
-     * canonical location.
+     * The catalog owns canonical
+     * experience information.
      *
-     * For example, if somebody asks for
-     * "Uffizi in Rome", Uffizi still
-     * resolves to Florence.
+     * For example:
+     * "Uffizi in Rome"
+     * still resolves to Florence.
      */
     const normalizedRequest:
       SearchRequest = {
@@ -94,15 +102,16 @@ export class SearchResultsService {
     };
 
     const evaluation =
-      this.evaluateExperience(
-        experience,
+      await this
+        .evaluateExperienceFromBackend(
+          experience,
 
-        normalizedRequest
-          .requestedDate,
+          normalizedRequest
+            .requestedDate,
 
-        normalizedRequest
-          .requestedTicketCount,
-      );
+          normalizedRequest
+            .requestedTicketCount,
+        );
 
     normalizedRequest.requestedDate =
       evaluation.requestedDate;
@@ -131,10 +140,12 @@ export class SearchResultsService {
 
     const suggestedExperiences =
       shouldSuggestAlternatives
-        ? this.getSuggestedExperiences(
-            experience,
-            normalizedRequest,
-          )
+        ? await this
+            .getSuggestedExperiences(
+              experience,
+
+              normalizedRequest,
+            )
         : undefined;
 
     return this.createResult({
@@ -149,50 +160,162 @@ export class SearchResultsService {
     });
   }
 
-  private evaluateExperience(
+  private async evaluateExperienceFromBackend(
     experience: Experience,
     requestedDate: string,
     requestedTicketCount: number,
-  ): ExperienceEvaluation {
-    /*
-     * SearchResultsService no longer
-     * knows how availability is obtained.
-     *
-     * It asks the provider registry for
-     * the provider that supports this
-     * experience.
-     */
-    const provider =
-      this.availabilityProviderService
-        .getProvider(
-          experience,
-        );
+  ): Promise<ExperienceEvaluation> {
+    try {
+      const response =
+        await this
+          .availabilityApiService
+          .checkAvailability({
+            experienceId:
+              experience.id,
 
-    /*
-     * Every provider returns the same
-     * normalized Trovato availability
-     * contract.
-     */
-    const providerAvailability =
-      provider.getAvailability({
-        experience,
-        requestedDate,
-      });
+            requestedDate,
 
-    if (
-      providerAvailability
-        .providerError
-    ) {
+            travellers:
+              requestedTicketCount,
+          });
+
+      if (
+        response.providerError
+      ) {
+        return {
+          providerError:
+            true,
+
+          requestedDate:
+            response
+              .requestedDate,
+
+          requestedDateSlots:
+            [],
+
+          alternateDates:
+            [],
+
+          largestAvailableGroupSize:
+            0,
+
+          state:
+            'provider-error',
+        };
+      }
+
+      const requestedDateSlots:
+        AvailabilitySlot[] =
+          response
+            .requestedDateSlots
+            .map(
+              (slot) => ({
+                id:
+                  slot.id,
+
+                time:
+                  slot.time,
+
+                availableTickets:
+                  slot
+                    .availableTickets,
+
+                pricePerPerson:
+                  slot
+                    .pricePerPerson,
+
+                bookingUrl:
+                  slot.bookingUrl,
+              }),
+            );
+
+      const alternateDates:
+        AvailableDate[] =
+          response
+            .alternateDates
+            .map(
+              (
+                availableDate,
+              ) => ({
+                date:
+                  availableDate
+                    .date,
+
+                slots:
+                  availableDate
+                    .slots
+                    .map(
+                      (slot) => ({
+                        id:
+                          slot.id,
+
+                        time:
+                          slot.time,
+
+                        availableTickets:
+                          slot
+                            .availableTickets,
+
+                        pricePerPerson:
+                          slot
+                            .pricePerPerson,
+
+                        bookingUrl:
+                          slot
+                            .bookingUrl,
+                      }),
+                    ),
+              }),
+            );
+
+      const state =
+        this.determineState({
+          requestedDateSlots,
+
+          alternateDates,
+
+          largestAvailableGroupSize:
+            response
+              .largestAvailableGroupSize,
+
+          requestedTicketCount,
+        });
+
       return {
-        providerError: true,
+        providerError:
+          false,
 
         requestedDate:
-          providerAvailability
+          response
             .requestedDate,
 
-        requestedDateSlots: [],
+        requestedDateSlots,
 
-        alternateDates: [],
+        alternateDates,
+
+        largestAvailableGroupSize:
+          response
+            .largestAvailableGroupSize,
+
+        state,
+      };
+    } catch (error) {
+      console.error(
+        'Backend availability request failed',
+        error,
+      );
+
+      return {
+        providerError:
+          true,
+
+        requestedDate,
+
+        requestedDateSlots:
+          [],
+
+        alternateDates:
+          [],
 
         largestAvailableGroupSize:
           0,
@@ -201,131 +324,21 @@ export class SearchResultsService {
           'provider-error',
       };
     }
-
-    /*
-     * Provider inventory tells us what
-     * exists.
-     *
-     * Trovato decides which slots are
-     * actually usable for this user's
-     * requested group size.
-     */
-    const requestedDateSlots =
-      this.filterBookableSlots(
-        providerAvailability
-          .requestedDateSlots,
-
-        requestedTicketCount,
-      );
-
-    const alternateDates =
-      providerAvailability
-        .alternateDates
-        .map(
-          (
-            availableDate,
-          ) => ({
-            ...availableDate,
-
-            slots:
-              this.filterBookableSlots(
-                availableDate.slots,
-                requestedTicketCount,
-              ),
-          }),
-        )
-        .filter(
-          (
-            availableDate,
-          ) =>
-            availableDate
-              .slots
-              .length > 0,
-        );
-
-    /*
-     * Keep the unfiltered provider slots
-     * when calculating capacity.
-     *
-     * This lets Trovato distinguish:
-     *
-     * "nothing is available"
-     *
-     * from:
-     *
-     * "availability exists, but the
-     * requested group is too large".
-     */
-    const alternateProviderSlots =
-      providerAvailability
-        .alternateDates
-        .reduce<
-          AvailabilitySlot[]
-        >(
-          (
-            slots,
-            availableDate,
-          ) => [
-            ...slots,
-            ...availableDate.slots,
-          ],
-          [],
-        );
-
-    const allProviderSlots = [
-      ...providerAvailability
-        .requestedDateSlots,
-
-      ...alternateProviderSlots,
-    ];
-
-    const largestAvailableGroupSize =
-      this.getLargestAvailableGroupSize(
-        allProviderSlots,
-      );
-
-    const state =
-      this.determineState({
-        requestedDateSlots,
-
-        alternateDates,
-
-        largestAvailableGroupSize,
-
-        requestedTicketCount,
-      });
-
-    return {
-      providerError: false,
-
-      requestedDate:
-        providerAvailability
-          .requestedDate,
-
-      requestedDateSlots,
-
-      alternateDates,
-
-      largestAvailableGroupSize,
-
-      state,
-    };
   }
 
-  private getSuggestedExperiences(
+  private async getSuggestedExperiences(
     requestedExperience:
       Experience,
 
     request:
       SearchRequest,
-  ): SuggestedExperience[] {
+  ): Promise<
+    SuggestedExperience[]
+  > {
     /*
-     * Ask the catalog for more
-     * alternatives than we intend to
-     * display.
-     *
-     * Some candidates may fail their
-     * availability check.
+     * Ask for more candidates than
+     * we display because some may
+     * have no suitable availability.
      */
     const geographicCandidates =
       this.experienceCatalogService
@@ -337,46 +350,61 @@ export class SearchResultsService {
           10,
         );
 
+    /*
+     * Every suggested experience now
+     * checks the SAME backend
+     * availability service as the
+     * primary result and alert checker.
+     */
+    const evaluatedCandidates =
+      await Promise.all(
+        geographicCandidates.map(
+          async (
+            candidate,
+          ) => ({
+            candidate,
+
+            evaluation:
+              await this
+                .evaluateExperienceFromBackend(
+                  candidate,
+
+                  request
+                    .requestedDate,
+
+                  request
+                    .requestedTicketCount,
+                ),
+          }),
+        ),
+      );
+
     const sameDateSuggestions:
-      SuggestedExperience[] = [];
+      SuggestedExperience[] =
+        [];
 
     const alternateDateSuggestions:
-      SuggestedExperience[] = [];
+      SuggestedExperience[] =
+        [];
 
     for (
-      const candidate of
-        geographicCandidates
+      const {
+        candidate,
+        evaluation,
+      } of evaluatedCandidates
     ) {
-      /*
-       * evaluateExperience() goes
-       * through the provider registry.
-       *
-       * This means alternatives can use
-       * completely different providers
-       * from the originally requested
-       * experience.
-       */
-      const evaluation =
-        this.evaluateExperience(
-          candidate,
-
-          request.requestedDate,
-
-          request
-            .requestedTicketCount,
-        );
-
       /*
        * Never recommend:
        *
-       * - provider failures
-       * - experiences that cannot fit
-       *   the full requested group
+       * - failed providers
+       * - experiences that cannot
+       *   accommodate the group
        * - experiences with no useful
        *   availability
        */
       if (
-        evaluation.providerError ||
+        evaluation
+          .providerError ||
         (
           evaluation.state !==
             'available' &&
@@ -421,25 +449,23 @@ export class SearchResultsService {
       };
 
       /*
-       * Same-date availability always
-       * ranks before an experience that
-       * requires changing the date.
-       *
-       * Geographic priority is already
-       * preserved by the catalog's
-       * candidate ordering.
+       * Same-date matches rank before
+       * experiences that require a
+       * different date.
        */
       if (
         evaluation.state ===
         'available'
       ) {
-        sameDateSuggestions.push(
-          suggestion,
-        );
+        sameDateSuggestions
+          .push(
+            suggestion,
+          );
       } else {
-        alternateDateSuggestions.push(
-          suggestion,
-        );
+        alternateDateSuggestions
+          .push(
+            suggestion,
+          );
       }
     }
 
@@ -470,7 +496,8 @@ export class SearchResultsService {
   }
 
   private createUnsupportedResult(
-    request: SearchRequest,
+    request:
+      SearchRequest,
   ): SearchResult {
     const requestedTitle =
       request.experience
@@ -503,9 +530,11 @@ export class SearchResultsService {
       state:
         'unsupported-experience',
 
-      requestedDateSlots: [],
+      requestedDateSlots:
+        [],
 
-      alternateDates: [],
+      alternateDates:
+        [],
 
       errorMessage:
         `We do not currently have booking information for ${requestedTitle}. Try another attraction or return to chat.`,
@@ -538,10 +567,6 @@ export class SearchResultsService {
       requestedTicketCount,
     } = options;
 
-    /*
-     * Best case:
-     * the requested date itself works.
-     */
     if (
       requestedDateSlots.length >
       0
@@ -549,11 +574,6 @@ export class SearchResultsService {
       return 'available';
     }
 
-    /*
-     * Requested date does not work,
-     * but another date can accommodate
-     * the entire group.
-     */
     if (
       alternateDates.length >
       0
@@ -561,11 +581,6 @@ export class SearchResultsService {
       return 'alternate-dates';
     }
 
-    /*
-     * Inventory exists, but nowhere in
-     * the provider result can fit the
-     * requested number of travellers.
-     */
     if (
       largestAvailableGroupSize >
         0 &&
@@ -653,43 +668,12 @@ export class SearchResultsService {
           .largestAvailableGroupSize,
 
       errorMessage:
-        options.errorMessage,
+        options
+          .errorMessage,
 
       suggestedExperiences:
         options
           .suggestedExperiences,
     };
-  }
-
-  private filterBookableSlots(
-    slots:
-      AvailabilitySlot[],
-
-    requestedTicketCount:
-      number,
-  ): AvailabilitySlot[] {
-    return slots.filter(
-      (slot) =>
-        slot.availableTickets >=
-        requestedTicketCount,
-    );
-  }
-
-  private getLargestAvailableGroupSize(
-    slots:
-      AvailabilitySlot[],
-  ): number {
-    if (
-      slots.length === 0
-    ) {
-      return 0;
-    }
-
-    return Math.max(
-      ...slots.map(
-        (slot) =>
-          slot.availableTickets,
-      ),
-    );
   }
 }

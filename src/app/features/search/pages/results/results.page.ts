@@ -20,6 +20,9 @@ import {
   SearchRequest,
 } from '../../../../core/services/chat-api.service';
 import {
+  MenuButtonComponent,
+} from '../../../../shared/components/menu-button/menu-button.component';
+import {
   AvailabilitySlot,
   AvailableDate,
   SearchResult,
@@ -28,7 +31,6 @@ import {
 import {
   SearchResultsService,
 } from '../../services/search-results.service';
-import { MenuButtonComponent } from '../../../../shared/components/menu-button/menu-button.component';
 
 type NotifySetupState =
   | 'auth'
@@ -43,7 +45,10 @@ type NotifySetupState =
   templateUrl: './results.page.html',
   styleUrls: ['./results.page.scss'],
   standalone: true,
-  imports: [IonContent,MenuButtonComponent,],
+  imports: [
+    IonContent,
+    MenuButtonComponent,
+  ],
 })
 export class ResultsPage implements OnInit {
   private readonly searchStorageKey =
@@ -119,15 +124,46 @@ export class ResultsPage implements OnInit {
       </svg>
     `);
 
-  result: SearchResult;
+  /*
+   * Safe initial value while the first
+   * backend availability request is running.
+   *
+   * The real result replaces this during
+   * ngOnInit().
+   */
+  result: SearchResult = {
+    id: 'loading',
 
-  selectedDate: string;
-  selectedSlots: AvailabilitySlot[];
+    title:
+      'Checking availability',
+
+    city: '',
+
+    location: '',
+
+    requestedDate: '',
+
+    requestedTicketCount: 0,
+
+    state:
+      'no-availability',
+
+    requestedDateSlots: [],
+
+    alternateDates: [],
+  };
+
+  selectedDate = '';
+
+  selectedSlots:
+    AvailabilitySlot[] = [];
 
   openingSlotId:
     string | null = null;
 
   isChangingExperience = false;
+
+  isLoadingResults = true;
 
   notifySetupState:
     NotifySetupState = null;
@@ -153,7 +189,10 @@ export class ResultsPage implements OnInit {
 
     private readonly notificationWatchService:
       NotificationWatchService,
-  ) {
+  ) {}
+
+  async ngOnInit():
+    Promise<void> {
     const navigation =
       this.router
         .getCurrentNavigation();
@@ -173,42 +212,46 @@ export class ResultsPage implements OnInit {
       this.storeSearch(search);
     }
 
-    this.result =
-      this.searchResultsService
-        .search(
-          search
-            ? {
-                experience:
-                  search.experience,
+    try {
+      this.result =
+        await this.searchResultsService
+          .search(
+            search
+              ? {
+                  experience:
+                    search.experience,
 
-                city:
-                  search.city,
+                  city:
+                    search.city,
 
-                requestedDate:
-                  search.date,
+                  requestedDate:
+                    search.date,
 
-                requestedTicketCount:
-                  search.travellers,
-              }
-            : undefined,
-        );
+                  requestedTicketCount:
+                    search.travellers,
+                }
+              : undefined,
+          );
 
-    this.selectedDate =
-      this.result.requestedDate;
+      this.selectedDate =
+        this.result.requestedDate;
 
-    this.selectedSlots =
-      this.result
-        .requestedDateSlots;
-  }
+      this.selectedSlots =
+        this.result
+          .requestedDateSlots;
+    } finally {
+      this.isLoadingResults =
+        false;
+    }
 
-  async ngOnInit():
-    Promise<void> {
-    await this.authService.initialize();
+    await this.authService
+      .initialize();
 
     this.isAuthInitializing =
       false;
 
-    await this.syncNotificationState();
+    await this
+      .syncNotificationState();
 
     if (
       this.authService
@@ -278,10 +321,10 @@ export class ResultsPage implements OnInit {
       date.slots;
   }
 
-  selectSuggestedExperience(
+  async selectSuggestedExperience(
     experience:
       SuggestedExperience,
-  ): void {
+  ): Promise<void> {
     if (
       this.isChangingExperience
     ) {
@@ -312,61 +355,65 @@ export class ResultsPage implements OnInit {
       nextSearch,
     );
 
-    const nextResult =
-      this.searchResultsService
-        .search({
-          experience:
-            nextSearch.experience,
+    try {
+      const nextResult =
+        await this.searchResultsService
+          .search({
+            experience:
+              nextSearch.experience,
 
-          city:
-            nextSearch.city,
+            city:
+              nextSearch.city,
 
-          requestedDate:
-            nextSearch.date,
+            requestedDate:
+              nextSearch.date,
 
-          requestedTicketCount:
-            nextSearch.travellers,
-        });
+            requestedTicketCount:
+              nextSearch.travellers,
+          });
 
-    this.result = nextResult;
+      this.result =
+        nextResult;
 
-    if (
-      nextResult.state ===
-        'alternate-dates' &&
-      nextResult
-        .alternateDates
-        .length > 0
-    ) {
-      const firstAvailableDate =
+      if (
+        nextResult.state ===
+          'alternate-dates' &&
         nextResult
-          .alternateDates[0];
+          .alternateDates
+          .length > 0
+      ) {
+        const firstAvailableDate =
+          nextResult
+            .alternateDates[0];
 
-      this.selectedDate =
-        firstAvailableDate.date;
+        this.selectedDate =
+          firstAvailableDate.date;
 
-      this.selectedSlots =
-        firstAvailableDate.slots;
-    } else {
-      this.selectedDate =
-        nextResult.requestedDate;
+        this.selectedSlots =
+          firstAvailableDate.slots;
+      } else {
+        this.selectedDate =
+          nextResult.requestedDate;
 
-      this.selectedSlots =
-        nextResult
-          .requestedDateSlots;
+        this.selectedSlots =
+          nextResult
+            .requestedDateSlots;
+      }
+
+      this.notifySetupState =
+        null;
+
+      await this
+        .syncNotificationState();
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
+    } finally {
+      this.isChangingExperience =
+        false;
     }
-
-    this.isChangingExperience =
-      false;
-
-    this.notifySetupState =
-      null;
-
-    void this.syncNotificationState();
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
   }
 
   continueBooking(
@@ -393,7 +440,8 @@ export class ResultsPage implements OnInit {
 
   notifyMe(): void {
     if (
-      this.isAuthInitializing
+      this.isAuthInitializing ||
+      this.isLoadingResults
     ) {
       return;
     }
@@ -468,7 +516,8 @@ export class ResultsPage implements OnInit {
       null;
   }
 
-  retryAvailability(): void {
+  async retryAvailability():
+    Promise<void> {
     if (
       this.result.state ===
       'unsupported-experience'
@@ -496,32 +545,42 @@ export class ResultsPage implements OnInit {
 
     this.storeSearch(search);
 
-    const nextResult =
-      this.searchResultsService
-        .search({
-          experience:
-            search.experience,
+    this.isLoadingResults =
+      true;
 
-          city:
-            search.city,
+    try {
+      const nextResult =
+        await this.searchResultsService
+          .search({
+            experience:
+              search.experience,
 
-          requestedDate:
-            search.date,
+            city:
+              search.city,
 
-          requestedTicketCount:
-            search.travellers,
-        });
+            requestedDate:
+              search.date,
 
-    this.result = nextResult;
+            requestedTicketCount:
+              search.travellers,
+          });
 
-    this.selectedDate =
-      nextResult.requestedDate;
+      this.result =
+        nextResult;
 
-    this.selectedSlots =
-      nextResult
-        .requestedDateSlots;
+      this.selectedDate =
+        nextResult.requestedDate;
 
-    void this.syncNotificationState();
+      this.selectedSlots =
+        nextResult
+          .requestedDateSlots;
+
+      await this
+        .syncNotificationState();
+    } finally {
+      this.isLoadingResults =
+        false;
+    }
   }
 
   changeSearch(): void {
@@ -569,7 +628,8 @@ export class ResultsPage implements OnInit {
   ): void {
     switch (permission) {
       case 'granted':
-        void this.activateNotification();
+        void this
+          .activateNotification();
         return;
 
       case 'default':
@@ -590,90 +650,107 @@ export class ResultsPage implements OnInit {
   }
 
   private async activateNotification():
-  Promise<void> {
-  const user =
-    this.authService
-      .getCurrentUser();
+    Promise<void> {
+    const user =
+      this.authService
+        .getCurrentUser();
 
-  if (!user) {
-    this.notifySetupState =
-      'auth';
+    if (!user) {
+      this.notifySetupState =
+        'auth';
 
-    return;
+      return;
+    }
+
+    try {
+      await this
+        .notificationWatchService
+        .createWatch({
+          userId:
+            user.id,
+
+          experienceId:
+            this.result.id,
+
+          experienceTitle:
+            this.result.title,
+
+          requestedDate:
+            this.result
+              .requestedDate,
+
+          travellers:
+            this.result
+              .requestedTicketCount,
+        });
+
+      this.hasActiveNotification =
+        true;
+
+      this.notifySetupState =
+        'active';
+    } catch (error) {
+      console.error(
+        'Could not create availability watch',
+        error,
+      );
+
+      this.hasActiveNotification =
+        false;
+
+      this.notifySetupState =
+        null;
+    }
   }
-
-  try {
-    await this.notificationWatchService
-      .createWatch({
-        userId: user.id,
-
-        experienceId:
-          this.result.id,
-
-        experienceTitle:
-          this.result.title,
-
-        requestedDate:
-          this.result
-            .requestedDate,
-
-        travellers:
-          this.result
-            .requestedTicketCount,
-      });
-
-    this.hasActiveNotification =
-      true;
-
-    this.notifySetupState =
-      'active';
-  } catch (error) {
-    console.error(
-      'Could not create availability watch',
-      error,
-    );
-
-    this.hasActiveNotification =
-      false;
-
-    this.notifySetupState =
-      null;
-  }
-}
 
   private async syncNotificationState():
-  Promise<void> {
-  const user =
-    this.authService
-      .getCurrentUser();
+    Promise<void> {
+    const user =
+      this.authService
+        .getCurrentUser();
 
-  if (!user) {
-    this.hasActiveNotification =
-      false;
+    if (!user) {
+      this.hasActiveNotification =
+        false;
 
-    return;
+      return;
+    }
+
+    if (
+      this.result.id ===
+      'loading'
+    ) {
+      this.hasActiveNotification =
+        false;
+
+      return;
+    }
+
+    try {
+      this.hasActiveNotification =
+        await this
+          .notificationWatchService
+          .hasActiveWatch(
+            user.id,
+
+            this.result.id,
+
+            this.result
+              .requestedDate,
+
+            this.result
+              .requestedTicketCount,
+          );
+    } catch (error) {
+      console.error(
+        'Could not load availability watch',
+        error,
+      );
+
+      this.hasActiveNotification =
+        false;
+    }
   }
-
-  try {
-    this.hasActiveNotification =
-      await this.notificationWatchService
-        .hasActiveWatch(
-          user.id,
-          this.result.id,
-          this.result.requestedDate,
-          this.result
-            .requestedTicketCount,
-        );
-  } catch (error) {
-    console.error(
-      'Could not load availability watch',
-      error,
-    );
-
-    this.hasActiveNotification =
-      false;
-  }
-}
 
   private storePendingNotifyIntent():
     void {
@@ -717,7 +794,9 @@ export class ResultsPage implements OnInit {
     try {
       sessionStorage.setItem(
         this.searchStorageKey,
-        JSON.stringify(search),
+        JSON.stringify(
+          search,
+        ),
       );
     } catch {
       // Session storage is optional.

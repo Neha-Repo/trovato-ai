@@ -435,20 +435,58 @@ export class ChatService {
   }
 
   private extractTravellerCountFromText(text: string): number | null {
-    const explicitMatches = [
+    /*
+     * Direct forms:
+     *
+     * "2 tickets"
+     * "4 people"
+     * "3 travellers"
+     */
+    const directMatches = [
       ...text.matchAll(
         /\b(\d+)\s*(ticket|tickets|traveller|travellers|traveler|travelers|person|people|adult|adults)\b/gi,
       ),
     ];
 
-    const latestExplicitMatch = explicitMatches.at(-1);
+    const latestDirectMatch = directMatches.at(-1);
 
-    if (latestExplicitMatch) {
-      const count = Number(latestExplicitMatch[1]);
+    if (latestDirectMatch) {
+      const count = Number(latestDirectMatch[1]);
 
       return count > 0 ? count : null;
     }
 
+    /*
+     * Attraction-between-number-and-ticket forms:
+     *
+     * "2 Vatican Museums tickets"
+     * "3 Uffizi Gallery tickets"
+     * "4 Colosseum tickets"
+     *
+     * The month guard prevents dates such as
+     * "25 August ... tickets" from becoming
+     * traveller counts.
+     */
+    const attractionTicketMatches = [
+      ...text.matchAll(
+        /\b(\d+)(?!\s+(?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|september|oct|october|nov|november|dec|december)\b)(?:\s+[a-z][a-z'-]*){1,5}\s+tickets?\b/gi,
+      ),
+    ];
+
+    const latestAttractionTicketMatch = attractionTicketMatches.at(-1);
+
+    if (latestAttractionTicketMatch) {
+      const count = Number(latestAttractionTicketMatch[1]);
+
+      return count > 0 ? count : null;
+    }
+
+    /*
+     * Conversational follow-up:
+     *
+     * User: "How many?"
+     * User: "4"
+     */
     if (/^\d+$/.test(text.trim())) {
       const count = Number(text.trim());
 
