@@ -8,12 +8,14 @@ import { AlertsModule } from './alerts/alerts.module';
 import { ChatController } from './chat/chat.controller';
 import { ChatService } from './chat/chat.service';
 import { OllamaService } from './chat/ollama.service';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     AvailabilityModule,
     AlertsModule,
   ],

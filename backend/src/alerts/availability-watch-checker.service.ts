@@ -5,6 +5,7 @@ import {
   AvailabilityWatch,
   AvailabilityWatchService,
 } from './availability-watch.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class AvailabilityWatchCheckerService {
@@ -20,6 +21,13 @@ export class AvailabilityWatchCheckerService {
     for (const watch of watches) {
       await this.checkWatch(watch);
     }
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async runScheduledCheck(): Promise<void> {
+    console.log('Running scheduled availability watch check');
+
+    await this.checkActiveWatches();
   }
 
   private async checkWatch(watch: AvailabilityWatch): Promise<void> {
@@ -55,6 +63,7 @@ export class AvailabilityWatchCheckerService {
 
         experienceId: watch.experienceId,
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         error,
       });
     }
