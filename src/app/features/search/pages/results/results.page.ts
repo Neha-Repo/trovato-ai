@@ -14,8 +14,11 @@ import {
 } from '../../../../core/services/auth.service';
 import {
   NotificationWatchService,
-  PushPermissionStatus,
 } from '../../../../core/services/notification-watch.service';
+
+import {
+  PushPermissionStatus,
+} from '../../../../core/models/push-permission-status';
 import {
   SearchRequest,
 } from '../../../../core/services/chat-api.service';
@@ -124,13 +127,6 @@ export class ResultsPage implements OnInit {
       </svg>
     `);
 
-  /*
-   * Safe initial value while the first
-   * backend availability request is running.
-   *
-   * The real result replaces this during
-   * ngOnInit().
-   */
   result: SearchResult = {
     id: 'loading',
 
@@ -161,9 +157,11 @@ export class ResultsPage implements OnInit {
   openingSlotId:
     string | null = null;
 
-  isChangingExperience = false;
+  isChangingExperience =
+    false;
 
-  isLoadingResults = true;
+  isLoadingResults =
+    true;
 
   notifySetupState:
     NotifySetupState = null;
@@ -209,7 +207,9 @@ export class ResultsPage implements OnInit {
       this.readStoredSearch();
 
     if (search) {
-      this.storeSearch(search);
+      this.storeSearch(
+        search,
+      );
     }
 
     try {
@@ -234,7 +234,8 @@ export class ResultsPage implements OnInit {
           );
 
       this.selectedDate =
-        this.result.requestedDate;
+        this.result
+          .requestedDate;
 
       this.selectedSlots =
         this.result
@@ -260,7 +261,7 @@ export class ResultsPage implements OnInit {
     ) {
       this.clearPendingNotifyIntent();
 
-      this.continueNotifySetup();
+      await this.continueNotifySetup();
     }
   }
 
@@ -270,7 +271,8 @@ export class ResultsPage implements OnInit {
       .alternateDates
       .some(
         (date) =>
-          date.slots.length > 0,
+          date.slots.length >
+          0,
       );
   }
 
@@ -287,24 +289,30 @@ export class ResultsPage implements OnInit {
     boolean {
     return (
       this.selectedDate ===
-      this.result.requestedDate
+      this.result
+        .requestedDate
     );
   }
 
   get notificationButtonLabel():
     string {
-    if (this.isAuthInitializing) {
+    if (
+      this.isAuthInitializing
+    ) {
       return 'Checking account…';
     }
 
-    return this.hasActiveNotification
+    return this
+      .hasActiveNotification
       ? 'Notification active'
       : 'Notify me';
   }
 
-  selectRequestedDate(): void {
+  selectRequestedDate():
+    void {
     this.selectedDate =
-      this.result.requestedDate;
+      this.result
+        .requestedDate;
 
     this.selectedSlots =
       this.result
@@ -357,7 +365,8 @@ export class ResultsPage implements OnInit {
 
     try {
       const nextResult =
-        await this.searchResultsService
+        await this
+          .searchResultsService
           .search({
             experience:
               nextSearch.experience,
@@ -387,13 +396,16 @@ export class ResultsPage implements OnInit {
             .alternateDates[0];
 
         this.selectedDate =
-          firstAvailableDate.date;
+          firstAvailableDate
+            .date;
 
         this.selectedSlots =
-          firstAvailableDate.slots;
+          firstAvailableDate
+            .slots;
       } else {
         this.selectedDate =
-          nextResult.requestedDate;
+          nextResult
+            .requestedDate;
 
         this.selectedSlots =
           nextResult
@@ -419,7 +431,9 @@ export class ResultsPage implements OnInit {
   continueBooking(
     slot: AvailabilitySlot,
   ): void {
-    if (this.openingSlotId) {
+    if (
+      this.openingSlotId
+    ) {
       return;
     }
 
@@ -432,10 +446,13 @@ export class ResultsPage implements OnInit {
       'noopener,noreferrer',
     );
 
-    window.setTimeout(() => {
-      this.openingSlotId =
-        null;
-    }, 900);
+    window.setTimeout(
+      () => {
+        this.openingSlotId =
+          null;
+      },
+      900,
+    );
   }
 
   notifyMe(): void {
@@ -465,7 +482,7 @@ export class ResultsPage implements OnInit {
       return;
     }
 
-    this.continueNotifySetup();
+    void this.continueNotifySetup();
   }
 
   async signInAndContinue():
@@ -543,14 +560,17 @@ export class ResultsPage implements OnInit {
           .requestedTicketCount,
     };
 
-    this.storeSearch(search);
+    this.storeSearch(
+      search,
+    );
 
     this.isLoadingResults =
       true;
 
     try {
       const nextResult =
-        await this.searchResultsService
+        await this
+          .searchResultsService
           .search({
             experience:
               search.experience,
@@ -569,7 +589,8 @@ export class ResultsPage implements OnInit {
         nextResult;
 
       this.selectedDate =
-        nextResult.requestedDate;
+        nextResult
+          .requestedDate;
 
       this.selectedSlots =
         nextResult
@@ -588,9 +609,10 @@ export class ResultsPage implements OnInit {
   }
 
   goBackToChat(): void {
-    void this.router.navigate([
-      '/chat',
-    ]);
+    void this.router
+      .navigate([
+        '/chat',
+      ]);
   }
 
   handleImageError(
@@ -611,16 +633,16 @@ export class ResultsPage implements OnInit {
       this.fallbackImageUrl;
   }
 
-  private continueNotifySetup():
-    void {
-    const permission =
-      this.notificationWatchService
-        .getPushPermissionStatus();
+  private async continueNotifySetup():
+  Promise<void> {
+  const permission =
+    await this.notificationWatchService
+      .getPushPermissionStatus();
 
-    this.handlePushPermission(
-      permission,
-    );
-  }
+  this.handlePushPermission(
+    permission,
+  );
+}
 
   private handlePushPermission(
     permission:
@@ -660,6 +682,29 @@ export class ResultsPage implements OnInit {
         'auth';
 
       return;
+    }
+
+    /*
+     * On a native Android/iOS build,
+     * register the device for push
+     * notifications and persist the
+     * token in Supabase.
+     *
+     * Failure here does not prevent
+     * the availability watch itself
+     * from being created.
+     */
+    try {
+      await this
+        .notificationWatchService
+        .registerNativePushDevice(
+          user.id,
+        );
+    } catch (error) {
+      console.error(
+        'Could not register native push device',
+        error,
+      );
     }
 
     try {

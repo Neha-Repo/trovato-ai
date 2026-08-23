@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "908317422222",
+    "project_id": "trovato-ai-b7724",
+    "storage_bucket": "trovato-ai-b7724.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:908317422222:android:ea23305dc97c8874b48fdf",
+        "android_client_info": {
+          "package_name": "com.trovato.ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCehedlUteeFo6S3shcHyV2_OfOy-y_Nsc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

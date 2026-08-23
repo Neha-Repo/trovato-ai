@@ -6,6 +6,8 @@ import {
 } from '@supabase/supabase-js';
 
 import { SupabaseService } from './supabase.service';
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 
 @Injectable({
   providedIn: 'root',
@@ -17,7 +19,9 @@ export class AuthService {
 
   constructor(
     private readonly supabaseService: SupabaseService,
-  ) {}
+  ) {
+    this.initializeNativeAuthCallback();
+  }
 
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -66,26 +70,28 @@ export class AuthService {
     );
   }
 
-  async signInWithGoogle(): Promise<void> {
-    const redirectTo =
-      `${window.location.origin}/results`;
+ async signInWithGoogle(): Promise<void> {
+  const redirectTo =
+    Capacitor.isNativePlatform()
+      ? 'com.trovato.ai://auth/callback'
+      : `${window.location.origin}/results`;
 
-    const {
-      error,
-    } =
-      await this.supabaseService.client.auth.signInWithOAuth(
-        {
-          provider: 'google',
-          options: {
-            redirectTo,
-          },
+  const {
+    error,
+  } =
+    await this.supabaseService.client.auth.signInWithOAuth(
+      {
+        provider: 'google',
+        options: {
+          redirectTo,
         },
-      );
+      },
+    );
 
-    if (error) {
-      throw error;
-    }
+  if (error) {
+    throw error;
   }
+}
 
   /*
    * Temporary compatibility bridge.
@@ -110,4 +116,62 @@ export class AuthService {
 
     this.session = null;
   }
+
+  private initializeNativeAuthCallback(): void {
+  if (!Capacitor.isNativePlatform()) {
+    return;
+  }
+
+  void App.addListener(
+    'appUrlOpen',
+    async ({ url }) => {
+      if (
+        !url.startsWith(
+          'com.trovato.ai://auth/callback',
+        )
+      ) {
+        return;
+      }
+
+      try {
+        const parsedUrl =
+          new URL(url);
+
+        const code =
+          parsedUrl.searchParams.get(
+            'code',
+          );
+
+        if (!code) {
+          console.error(
+            'OAuth callback did not contain a code.',
+          );
+          return;
+        }
+
+        const {
+          data,
+          error,
+        } =
+          await this.supabaseService.client.auth
+            .exchangeCodeForSession(code);
+
+        if (error) {
+          throw error;
+        }
+
+        this.session =
+          data.session;
+
+        window.location.href =
+          '/results';
+      } catch (error) {
+        console.error(
+          'Failed to complete Google sign-in',
+          error,
+        );
+      }
+    },
+  );
+}
 }

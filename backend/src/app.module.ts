@@ -9,6 +9,7 @@ import { ChatController } from './chat/chat.controller';
 import { ChatService } from './chat/chat.service';
 import { OllamaService } from './chat/ollama.service';
 import { ScheduleModule } from '@nestjs/schedule';
+import { PushModule } from './push/push.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ScheduleModule.forRoot(),
     AvailabilityModule,
     AlertsModule,
+    PushModule,
   ],
 
   controllers: [AppController, ChatController],

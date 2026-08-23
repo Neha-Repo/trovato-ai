@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 import { AvailabilityService } from '../availability/availability.service';
+import { FirebasePushService } from '../push/firebase-push.service';
+import { PushDeviceService } from '../push/push-device.service';
 import {
   AvailabilityWatch,
   AvailabilityWatchService,
@@ -13,6 +15,10 @@ export class AvailabilityWatchCheckerService {
     private readonly availabilityService: AvailabilityService,
 
     private readonly availabilityWatchService: AvailabilityWatchService,
+
+    private readonly pushDeviceService: PushDeviceService,
+
+    private readonly firebasePushService: FirebasePushService,
   ) {}
 
   async checkActiveWatches(): Promise<void> {
@@ -21,13 +27,6 @@ export class AvailabilityWatchCheckerService {
     for (const watch of watches) {
       await this.checkWatch(watch);
     }
-  }
-
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async runScheduledCheck(): Promise<void> {
-    console.log('Running scheduled availability watch check');
-
-    await this.checkActiveWatches();
   }
 
   private async checkWatch(watch: AvailabilityWatch): Promise<void> {
@@ -44,10 +43,36 @@ export class AvailabilityWatchCheckerService {
         return;
       }
 
+      const tokens = await this.pushDeviceService.getTokensForUser(
+        watch.userId,
+      );
+
+      if (tokens.length === 0) {
+        console.warn('Availability matched but no push device exists', {
+          watchId: watch.id,
+
+          userId: watch.userId,
+        });
+
+        return;
+      }
+
+      for (const token of tokens) {
+        await this.firebasePushService.sendAvailabilityNotification(token, {
+          title: 'Tickets available',
+
+          body: `${watch.experienceTitle} now has availability for ${watch.travellers} ${
+            watch.travellers === 1 ? 'traveller' : 'travellers'
+          } on ${watch.requestedDate}.`,
+        });
+      }
+
       await this.availabilityWatchService.markMatched(watch.id);
 
-      console.log('Availability watch matched', {
+      console.log('Availability watch matched and notification sent', {
         watchId: watch.id,
+
+        userId: watch.userId,
 
         experienceId: watch.experienceId,
 
@@ -55,7 +80,7 @@ export class AvailabilityWatchCheckerService {
 
         travellers: watch.travellers,
 
-        availableSlots: result.requestedDateSlots.length,
+        pushDevices: tokens.length,
       });
     } catch (error) {
       console.error('Availability watch check failed', {
@@ -63,9 +88,14 @@ export class AvailabilityWatchCheckerService {
 
         experienceId: watch.experienceId,
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         error,
       });
     }
+  }
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async runScheduledCheck(): Promise<void> {
+    console.log('Running scheduled availability watch check...');
+
+    await this.checkActiveWatches();
   }
 }

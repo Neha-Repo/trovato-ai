@@ -1,12 +1,14 @@
 import { Injectable } from '@angular/core';
 
 import { SupabaseService } from './supabase.service';
+import { Capacitor } from '@capacitor/core';
 
-export type PushPermissionStatus =
-  | 'granted'
-  | 'denied'
-  | 'default'
-  | 'unsupported';
+import { PushDeviceService } from './push-device.service';
+import { PushNotificationService } from './push-notification.service';
+import {
+  PushPermissionStatus,
+} from '../models/push-permission-status';
+
 
 export type AvailabilityWatchStatus =
   | 'active'
@@ -62,32 +64,103 @@ interface CreateAvailabilityWatch {
 })
 export class NotificationWatchService {
   constructor(
-    private readonly supabaseService:
-      SupabaseService,
-  ) {}
+  private readonly supabaseService:
+    SupabaseService,
 
-  getPushPermissionStatus():
-    PushPermissionStatus {
-    if (!('Notification' in window)) {
-      return 'unsupported';
-    }
+  private readonly pushNotificationService:
+    PushNotificationService,
 
-    return Notification.permission;
-  }
+  private readonly pushDeviceService:
+    PushDeviceService,
+) {}
 
-  async requestPushPermission():
-    Promise<PushPermissionStatus> {
-    if (!('Notification' in window)) {
-      return 'unsupported';
-    }
-
+ async getPushPermissionStatus():
+  Promise<PushPermissionStatus> {
+  if (Capacitor.isNativePlatform()) {
     try {
-      return await Notification
-        .requestPermission();
-    } catch {
+      const permission =
+        await this.pushNotificationService
+          .getPermissionStatus();
+
+      return permission;
+    } catch (error) {
+      console.error(
+        'Could not check native push permission',
+        error,
+      );
+
       return 'denied';
     }
   }
+
+  if (!('Notification' in window)) {
+    return 'unsupported';
+  }
+
+  return Notification.permission;
+}
+
+async requestPushPermission():
+  Promise<PushPermissionStatus> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      return await this.pushNotificationService
+        .requestPermission();
+    } catch (error) {
+      console.error(
+        'Could not request native push permission',
+        error,
+      );
+
+      return 'denied';
+    }
+  }
+
+  if (!('Notification' in window)) {
+    return 'unsupported';
+  }
+
+  try {
+    return await Notification
+      .requestPermission();
+  } catch {
+    return 'denied';
+  }
+}
+  async registerNativePushDevice(
+  userId: string,
+): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) {
+    return false;
+  }
+
+  const token =
+    await this.pushNotificationService
+      .register();
+
+  if (!token) {
+    return false;
+  }
+
+  const platform =
+    Capacitor.getPlatform();
+
+  if (
+    platform !== 'android' &&
+    platform !== 'ios'
+  ) {
+    return false;
+  }
+
+  await this.pushDeviceService
+    .saveDevice(
+      userId,
+      token,
+      platform,
+    );
+
+  return true;
+}
 
   async createWatch(
     input: CreateAvailabilityWatch,
