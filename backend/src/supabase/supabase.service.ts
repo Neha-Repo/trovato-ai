@@ -1,29 +1,35 @@
 import { Injectable } from '@nestjs/common';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+
+function createSupabaseClient() {
+  const supabaseUrl = process.env['SUPABASE_URL'];
+
+  const supabaseSecretKey = process.env['SUPABASE_SECRET_KEY'];
+
+  if (!supabaseUrl) {
+    throw new Error('SUPABASE_URL is not configured.');
+  }
+
+  if (!supabaseSecretKey) {
+    throw new Error('SUPABASE_SECRET_KEY is not configured.');
+  }
+
+  return createClient(supabaseUrl, supabaseSecretKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
+type BackendSupabaseClient = ReturnType<typeof createSupabaseClient>;
 
 @Injectable()
 export class SupabaseService {
-  readonly client: SupabaseClient;
+  readonly client: BackendSupabaseClient;
 
   constructor() {
-    const supabaseUrl = process.env['SUPABASE_URL'];
-
-    const supabaseSecretKey = process.env['SUPABASE_SECRET_KEY'];
-
-    if (!supabaseUrl) {
-      throw new Error('SUPABASE_URL is not configured.');
-    }
-
-    if (!supabaseSecretKey) {
-      throw new Error('SUPABASE_SECRET_KEY is not configured.');
-    }
-
-    this.client = createClient(supabaseUrl, supabaseSecretKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    });
+    this.client = createSupabaseClient();
   }
 }

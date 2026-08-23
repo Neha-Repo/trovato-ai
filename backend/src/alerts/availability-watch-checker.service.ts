@@ -82,7 +82,7 @@ export class AvailabilityWatchCheckerService {
 
         pushDevices: tokens.length,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Availability watch check failed', {
         watchId: watch.id,
 
