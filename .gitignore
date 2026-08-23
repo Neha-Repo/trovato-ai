@@ -72,3 +72,4 @@ testem.log
 Thumbs.db
 
 backend/secrets/
+backend/.env
