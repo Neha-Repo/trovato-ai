@@ -20,6 +20,15 @@ export const routes: Routes = [
       ),
   },
   {
+  path: 'results/notification/:watchId',
+  loadComponent: () =>
+    import(
+      './features/search/pages/results/results.page'
+    ).then(
+      (m) => m.ResultsPage,
+    ),
+},
+  {
     path: 'results',
     loadComponent: () =>
       import(

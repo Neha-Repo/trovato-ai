@@ -81,6 +81,7 @@ export class ResultsPage implements OnInit {
               offset="0%"
               stop-color="#13203a"
             />
+
             <stop
               offset="100%"
               stop-color="#07101f"
@@ -262,6 +263,28 @@ export class ResultsPage implements OnInit {
       this.clearPendingNotifyIntent();
 
       await this.continueNotifySetup();
+    }
+  }
+
+  async ionViewWillEnter():
+    Promise<void> {
+    if (
+      this.isLoadingResults ||
+      this.isAuthInitializing
+    ) {
+      return;
+    }
+
+    await this
+      .syncNotificationState();
+
+    if (
+      !this.hasActiveNotification &&
+      this.notifySetupState ===
+        'active'
+    ) {
+      this.notifySetupState =
+        null;
     }
   }
 
@@ -634,15 +657,16 @@ export class ResultsPage implements OnInit {
   }
 
   private async continueNotifySetup():
-  Promise<void> {
-  const permission =
-    await this.notificationWatchService
-      .getPushPermissionStatus();
+    Promise<void> {
+    const permission =
+      await this
+        .notificationWatchService
+        .getPushPermissionStatus();
 
-  this.handlePushPermission(
-    permission,
-  );
-}
+    this.handlePushPermission(
+      permission,
+    );
+  }
 
   private handlePushPermission(
     permission:

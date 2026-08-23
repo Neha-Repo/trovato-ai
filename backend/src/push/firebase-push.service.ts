@@ -10,6 +10,13 @@ interface FirebaseServiceAccount {
   private_key: string;
 }
 
+interface PushNotificationOptions {
+  title: string;
+  body: string;
+
+  data?: Record<string, string>;
+}
+
 @Injectable()
 export class FirebasePushService implements OnModuleInit {
   private app: App | null = null;
@@ -43,16 +50,13 @@ export class FirebasePushService implements OnModuleInit {
 
   async sendAvailabilityNotification(
     token: string,
-    options: {
-      title: string;
-      body: string;
-    },
+    options: PushNotificationOptions,
   ): Promise<string> {
     if (!this.app) {
       throw new Error('Firebase Admin is not initialized.');
     }
 
-    const messageId = await getMessaging(this.app).send({
+    return getMessaging(this.app).send({
       token,
 
       notification: {
@@ -61,11 +65,15 @@ export class FirebasePushService implements OnModuleInit {
         body: options.body,
       },
 
+      data: options.data,
+
       android: {
         priority: 'high',
+
+        notification: {
+          channelId: 'availability-alerts',
+        },
       },
     });
-
-    return messageId;
   }
 }

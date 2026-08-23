@@ -1,18 +1,24 @@
 import { Injectable } from '@angular/core';
+import { Router } from '@angular/router';
 import {
+  PushNotificationActionPerformed,
   PushNotifications,
   Token,
 } from '@capacitor/push-notifications';
+
 import {
   PushPermissionStatus,
 } from '../models/push-permission-status';
-
-
 
 @Injectable({
   providedIn: 'root',
 })
 export class PushNotificationService {
+  constructor(
+    private readonly router:
+      Router,
+  ) {}
+
   async getPermissionStatus():
     Promise<PushPermissionStatus> {
     const permission =
@@ -138,6 +144,100 @@ export class PushNotificationService {
 
         await PushNotifications
           .register();
+      },
+    );
+  }
+  async initializeAndroidChannel():
+  Promise<void> {
+  try {
+    await PushNotifications.createChannel({
+      id: 'availability-alerts',
+      name: 'Availability alerts',
+      description:
+        'Notifications when requested tickets become available.',
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+    });
+  } catch (error: unknown) {
+    console.error(
+      'Could not create notification channel',
+      error,
+    );
+  }
+}
+
+  async initializeNotificationActions():
+    Promise<void> {
+    await PushNotifications.addListener(
+      'pushNotificationActionPerformed',
+      async (
+        action:
+          PushNotificationActionPerformed,
+      ) => {
+        const data =
+          action.notification.data;
+
+        if (
+          data?.['type'] !==
+          'availability-match'
+        ) {
+          return;
+        }
+
+        const experience =
+          data[
+            'experienceTitle'
+          ];
+
+        const requestedDate =
+          data[
+            'requestedDate'
+          ];
+
+        const travellers =
+          Number(
+            data[
+              'travellers'
+            ],
+          );
+
+        if (
+          typeof experience !==
+            'string' ||
+          typeof requestedDate !==
+            'string' ||
+          !Number.isInteger(
+            travellers,
+          ) ||
+          travellers <= 0
+        ) {
+          console.error(
+            'Invalid availability notification payload',
+            data,
+          );
+
+          return;
+        }
+
+        await this.router.navigate(
+  [
+    '/results',
+    'notification',
+    data['watchId'],
+  ],
+  {
+            state: {
+              search: {
+                experience,
+                city: '',
+                date:
+                  requestedDate,
+                travellers,
+              },
+            },
+          },
+        );
       },
     );
   }

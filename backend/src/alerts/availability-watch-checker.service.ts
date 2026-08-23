@@ -64,6 +64,15 @@ export class AvailabilityWatchCheckerService {
           body: `${watch.experienceTitle} now has availability for ${watch.travellers} ${
             watch.travellers === 1 ? 'traveller' : 'travellers'
           } on ${watch.requestedDate}.`,
+
+          data: {
+            type: 'availability-match',
+            watchId: watch.id,
+            experienceId: watch.experienceId,
+            experienceTitle: watch.experienceTitle,
+            requestedDate: watch.requestedDate,
+            travellers: String(watch.travellers),
+          },
         });
       }
 

@@ -138,7 +138,7 @@ export class MockAvailabilityProvider implements AvailabilityProvider {
               {
                 time: '11:30 AM',
 
-                availableTickets: 8,
+                availableTickets: 12,
 
                 pricePerPerson: 29,
               },

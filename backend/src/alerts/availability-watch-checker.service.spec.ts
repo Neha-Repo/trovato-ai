@@ -143,6 +143,15 @@ describe('AvailabilityWatchCheckerService', () => {
       title: 'Tickets available',
 
       body: 'Vatican Museums now has availability for 2 travellers on 24 August 2026.',
+
+      data: {
+        type: 'availability-match',
+        watchId: 'watch-1',
+        experienceId: 'vatican-museums',
+        experienceTitle: 'Vatican Museums',
+        requestedDate: '24 August 2026',
+        travellers: '2',
+      },
     });
 
     expect(markMatched).toHaveBeenCalledWith(watch.id);
