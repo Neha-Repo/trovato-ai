@@ -1,9 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 
-import type {
-  AvailabilityCheckResult,
-  AvailabilityRequest,
-} from './availability-provider';
+import type { AvailabilityCheckResult } from './availability-provider';
+import { AvailabilityRequestDto } from './dto/availability-request.dto';
 import { AvailabilityService } from './availability.service';
 
 @Controller('availability')
@@ -13,7 +11,7 @@ export class AvailabilityController {
   @Post('check')
   async checkAvailability(
     @Body()
-    request: AvailabilityRequest,
+    request: AvailabilityRequestDto,
   ): Promise<AvailabilityCheckResult> {
     return this.availabilityService.checkAvailability(request);
   }

@@ -58,7 +58,6 @@ export class OllamaService {
      * deterministic + AI extraction in
      * ChatService.
      */
-    console.log('Ollama extraction:', extracted);
 
     return extracted;
   }

@@ -10,11 +10,13 @@ import { ChatService } from './chat/chat.service';
 import { OllamaService } from './chat/ollama.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PushModule } from './push/push.module';
+import { validateEnvironment } from './config/validate-env';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateEnvironment,
     }),
     ScheduleModule.forRoot(),
     AvailabilityModule,

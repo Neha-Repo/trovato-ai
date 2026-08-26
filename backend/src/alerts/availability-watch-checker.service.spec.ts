@@ -8,6 +8,7 @@ import {
   AvailabilityWatchService,
 } from './availability-watch.service';
 import { AvailabilityWatchCheckerService } from './availability-watch-checker.service';
+import { FirebaseMessagingError } from 'firebase-admin/messaging';
 
 describe('AvailabilityWatchCheckerService', () => {
   let service: AvailabilityWatchCheckerService;
@@ -25,6 +26,7 @@ describe('AvailabilityWatchCheckerService', () => {
   let getTokensForUser: jest.MockedFunction<
     PushDeviceService['getTokensForUser']
   >;
+  let removeToken: jest.MockedFunction<PushDeviceService['removeToken']>;
 
   let sendAvailabilityNotification: jest.MockedFunction<
     FirebasePushService['sendAvailabilityNotification']
@@ -47,6 +49,7 @@ describe('AvailabilityWatchCheckerService', () => {
     getActiveWatches = jest.fn();
     markMatched = jest.fn();
     getTokensForUser = jest.fn();
+    removeToken = jest.fn();
     sendAvailabilityNotification = jest.fn();
 
     const availabilityService = {
@@ -60,6 +63,7 @@ describe('AvailabilityWatchCheckerService', () => {
 
     const pushDeviceService = {
       getTokensForUser,
+      removeToken,
     } as unknown as PushDeviceService;
 
     const firebasePushService = {
@@ -276,5 +280,102 @@ describe('AvailabilityWatchCheckerService', () => {
     expect(markMatched).toHaveBeenCalledWith(secondWatch.id);
 
     expect(markMatched).not.toHaveBeenCalledWith(watch.id);
+  });
+  it('removes an invalid push token and keeps the watch active when no notification succeeds', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    getActiveWatches.mockResolvedValue([watch]);
+
+    checkAvailability.mockResolvedValue({
+      providerId: 'mock',
+      requestedDate: watch.requestedDate,
+      providerError: false,
+
+      requestedDateSlots: [
+        {
+          id: 'slot-1',
+          time: '9:00 AM',
+          availableTickets: 4,
+          pricePerPerson: 25,
+          bookingUrl: 'https://example.com',
+        },
+      ],
+
+      alternateDates: [],
+
+      largestAvailableGroupSize: 4,
+
+      available: true,
+    });
+
+    getTokensForUser.mockResolvedValue(['invalid-token']);
+
+    const firebaseError = new Error(
+      'Registration token is not registered',
+    ) as FirebaseMessagingError;
+
+    Object.setPrototypeOf(firebaseError, FirebaseMessagingError.prototype);
+
+    Object.defineProperty(firebaseError, 'code', {
+      value: 'messaging/registration-token-not-registered',
+    });
+
+    sendAvailabilityNotification.mockRejectedValue(firebaseError);
+
+    await service.checkActiveWatches();
+
+    expect(removeToken).toHaveBeenCalledWith('invalid-token');
+
+    expect(markMatched).not.toHaveBeenCalled();
+  });
+
+  it('removes an invalid token but still matches the watch when another device receives the push', async () => {
+    getActiveWatches.mockResolvedValue([watch]);
+
+    checkAvailability.mockResolvedValue({
+      providerId: 'mock',
+      requestedDate: watch.requestedDate,
+      providerError: false,
+
+      requestedDateSlots: [
+        {
+          id: 'slot-1',
+          time: '9:00 AM',
+          availableTickets: 4,
+          pricePerPerson: 25,
+          bookingUrl: 'https://example.com',
+        },
+      ],
+
+      alternateDates: [],
+
+      largestAvailableGroupSize: 4,
+
+      available: true,
+    });
+
+    getTokensForUser.mockResolvedValue(['invalid-token', 'valid-token']);
+
+    const firebaseError = new Error(
+      'Registration token is not registered',
+    ) as FirebaseMessagingError;
+
+    Object.setPrototypeOf(firebaseError, FirebaseMessagingError.prototype);
+
+    Object.defineProperty(firebaseError, 'code', {
+      value: 'messaging/registration-token-not-registered',
+    });
+
+    sendAvailabilityNotification
+      .mockRejectedValueOnce(firebaseError)
+      .mockResolvedValueOnce('message-id-valid');
+
+    await service.checkActiveWatches();
+
+    expect(removeToken).toHaveBeenCalledWith('invalid-token');
+
+    expect(sendAvailabilityNotification).toHaveBeenCalledTimes(2);
+
+    expect(markMatched).toHaveBeenCalledWith(watch.id);
   });
 });

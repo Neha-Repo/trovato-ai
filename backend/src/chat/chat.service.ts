@@ -147,16 +147,12 @@ export class ChatService {
       if (!extractedDate && aiSearch.date) {
         extractedDate = this.extractDate([aiSearch.date]);
       }
-    } catch (error) {
-      console.warn('Falling back to rule-based extraction.', error);
+    } catch (error: unknown) {
+      console.warn(
+        'Falling back to rule-based extraction.',
+        error instanceof Error ? error.message : 'Unknown error',
+      );
     }
-
-    console.log('Trovato search extraction:', {
-      experience,
-      city,
-      date: extractedDate?.value ?? null,
-      travellers,
-    });
 
     if (!experience) {
       return {

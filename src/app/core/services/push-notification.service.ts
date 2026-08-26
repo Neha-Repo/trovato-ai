@@ -105,10 +105,7 @@ export class PushNotificationService {
               (
                 token: Token,
               ) => {
-                console.log(
-                  'FCM TOKEN:',
-                  token.value,
-                );
+                
 
                 void registrationListener
                   .remove();

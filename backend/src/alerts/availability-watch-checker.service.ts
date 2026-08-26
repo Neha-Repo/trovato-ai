@@ -8,6 +8,7 @@ import {
   AvailabilityWatchService,
 } from './availability-watch.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { FirebaseMessagingError } from 'firebase-admin/messaging';
 
 @Injectable()
 export class AvailabilityWatchCheckerService {
@@ -50,61 +51,68 @@ export class AvailabilityWatchCheckerService {
       if (tokens.length === 0) {
         console.warn('Availability matched but no push device exists', {
           watchId: watch.id,
-
-          userId: watch.userId,
+          experienceId: watch.experienceId,
         });
 
         return;
       }
 
+      let sentSuccessfully = false;
+
       for (const token of tokens) {
-        await this.firebasePushService.sendAvailabilityNotification(token, {
-          title: 'Tickets available',
+        try {
+          await this.firebasePushService.sendAvailabilityNotification(token, {
+            title: 'Tickets available',
 
-          body: `${watch.experienceTitle} now has availability for ${watch.travellers} ${
-            watch.travellers === 1 ? 'traveller' : 'travellers'
-          } on ${watch.requestedDate}.`,
+            body: `${watch.experienceTitle} now has availability for ${watch.travellers} ${
+              watch.travellers === 1 ? 'traveller' : 'travellers'
+            } on ${watch.requestedDate}.`,
 
-          data: {
-            type: 'availability-match',
+            data: {
+              type: 'availability-match',
+              watchId: watch.id,
+              experienceId: watch.experienceId,
+              experienceTitle: watch.experienceTitle,
+              requestedDate: watch.requestedDate,
+              travellers: String(watch.travellers),
+            },
+          });
+
+          sentSuccessfully = true;
+        } catch (error: unknown) {
+          if (
+            error instanceof FirebaseMessagingError &&
+            (error.code === 'messaging/registration-token-not-registered' ||
+              error.code === 'messaging/invalid-registration-token')
+          ) {
+            await this.pushDeviceService.removeToken(token);
+
+            continue;
+          }
+
+          console.error('Push notification failed', {
             watchId: watch.id,
             experienceId: watch.experienceId,
-            experienceTitle: watch.experienceTitle,
-            requestedDate: watch.requestedDate,
-            travellers: String(watch.travellers),
-          },
-        });
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      if (!sentSuccessfully) {
+        return;
       }
 
       await this.availabilityWatchService.markMatched(watch.id);
-
-      console.log('Availability watch matched and notification sent', {
-        watchId: watch.id,
-
-        userId: watch.userId,
-
-        experienceId: watch.experienceId,
-
-        requestedDate: watch.requestedDate,
-
-        travellers: watch.travellers,
-
-        pushDevices: tokens.length,
-      });
     } catch (error: unknown) {
       console.error('Availability watch check failed', {
         watchId: watch.id,
-
         experienceId: watch.experienceId,
-
-        error,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
   @Cron(CronExpression.EVERY_5_MINUTES)
   async runScheduledCheck(): Promise<void> {
-    console.log('Running scheduled availability watch check...');
-
     await this.checkActiveWatches();
   }
 }

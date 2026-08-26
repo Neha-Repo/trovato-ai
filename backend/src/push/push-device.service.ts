@@ -27,4 +27,15 @@ export class PushDeviceService {
       )
       .map((device) => device.token);
   }
+
+  async removeToken(token: string): Promise<void> {
+    const { error } = await this.supabaseService.client
+      .from('push_devices')
+      .delete()
+      .eq('token', token);
+
+    if (error) {
+      throw new Error(`Could not remove push device: ${error.message}`);
+    }
+  }
 }
