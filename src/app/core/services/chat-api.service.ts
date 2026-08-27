@@ -20,8 +20,13 @@ export interface SearchRequest {
   travellers: number;
 }
 
+interface ChatRequestMessage {
+  sender: 'user' | 'assistant';
+  text: string;
+}
+
 interface ChatRequest {
-  messages: ChatMessage[];
+  messages: ChatRequestMessage[];
 }
 
 export interface ChatResponse {
@@ -44,7 +49,15 @@ export class ChatApiService {
     messages: ChatMessage[],
   ): Observable<ChatResponse> {
     const request: ChatRequest = {
-      messages,
+      messages:
+        messages.map(
+          (message) => ({
+            sender:
+              message.sender,
+            text:
+              message.text,
+          }),
+        ),
     };
 
     return this.http.post<ChatResponse>(

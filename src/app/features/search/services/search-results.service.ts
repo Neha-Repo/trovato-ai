@@ -166,18 +166,22 @@ export class SearchResultsService {
     requestedTicketCount: number,
   ): Promise<ExperienceEvaluation> {
     try {
-      const response =
-        await this
-          .availabilityApiService
-          .checkAvailability({
-            experienceId:
-              experience.id,
+      const apiRequestedDate =
+  this.toApiDate(requestedDate);
 
-            requestedDate,
+const response =
+  await this
+    .availabilityApiService
+    .checkAvailability({
+      experienceId:
+        experience.id,
 
-            travellers:
-              requestedTicketCount,
-          });
+      requestedDate:
+        apiRequestedDate,
+
+      travellers:
+        requestedTicketCount,
+    });
 
       if (
         response.providerError
@@ -592,6 +596,83 @@ export class SearchResultsService {
 
     return 'no-availability';
   }
+
+  private toApiDate(
+  value: string,
+): string {
+  const trimmed =
+    value.trim();
+
+  // Already in backend format.
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      trimmed,
+    )
+  ) {
+    return trimmed;
+  }
+
+  const normalized =
+    trimmed.toLowerCase();
+
+  const today =
+    new Date();
+
+  if (normalized === 'today') {
+    return this.formatApiDate(
+      today,
+    );
+  }
+
+  if (normalized === 'tomorrow') {
+    const tomorrow =
+      new Date(today);
+
+    tomorrow.setDate(
+      tomorrow.getDate() + 1,
+    );
+
+    return this.formatApiDate(
+      tomorrow,
+    );
+  }
+
+  const parsed =
+    new Date(trimmed);
+
+  if (
+    Number.isNaN(
+      parsed.getTime(),
+    )
+  ) {
+    throw new Error(
+      `Could not convert requested date "${value}" to YYYY-MM-DD.`,
+    );
+  }
+
+  return this.formatApiDate(
+    parsed,
+  );
+}
+
+private formatApiDate(
+  date: Date,
+): string {
+  const year =
+    date.getFullYear();
+
+  const month =
+    String(
+      date.getMonth() + 1,
+    ).padStart(2, '0');
+
+  const day =
+    String(
+      date.getDate(),
+    ).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
 
   private createResult(
     options: {

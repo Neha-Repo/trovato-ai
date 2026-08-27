@@ -1,5 +1,6 @@
 import {
   Component,
+  OnDestroy,
 } from '@angular/core';
 import {
   FormsModule,
@@ -12,18 +13,24 @@ import {
 } from '@ionic/angular/standalone';
 import {
   firstValueFrom,
+  Subscription,
 } from 'rxjs';
 
 import {
   ChatApiService,
 } from '../../../../core/services/chat-api.service';
 import {
+  ChatResetService,
+} from '../../../../core/services/chat-reset.service';
+import {
+  MenuButtonComponent,
+} from '../../../../shared/components/menu-button/menu-button.component';
+import {
   ChatMessage,
 } from '../../models/chat-message.model';
 import {
   ChatService,
 } from '../../services/chat.service';
-import { MenuButtonComponent } from '../../../../shared/components/menu-button/menu-button.component';
 
 @Component({
   selector: 'app-chat',
@@ -36,12 +43,16 @@ import { MenuButtonComponent } from '../../../../shared/components/menu-button/m
     MenuButtonComponent,
   ],
 })
-export class ChatPage {
+export class ChatPage
+  implements OnDestroy {
   userInput = '';
 
   messages: ChatMessage[] = [];
 
   isSending = false;
+
+  private readonly resetSubscription:
+    Subscription;
 
   constructor(
     private readonly chatService:
@@ -52,7 +63,23 @@ export class ChatPage {
 
     private readonly router:
       Router,
-  ) {}
+
+    private readonly chatResetService:
+      ChatResetService,
+  ) {
+    this.resetSubscription =
+      this.chatResetService.reset$
+        .subscribe(() => {
+          this.messages = [];
+          this.userInput = '';
+          this.isSending = false;
+        });
+  }
+
+  ngOnDestroy(): void {
+    this.resetSubscription
+      .unsubscribe();
+  }
 
   get hasConversation(): boolean {
     return this.messages.length > 0;

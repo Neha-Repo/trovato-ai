@@ -4,15 +4,23 @@
     type="overlay"
   >
     <ion-content>
-      <section class="menu-header">
-        <p class="menu-kicker">
-          Trovato AI
-        </p>
+      <ion-menu-toggle
+        autoHide="true"
+      >
+        <button
+          type="button"
+          class="menu-header"
+          (click)="startFreshChat()"
+        >
+          <p class="menu-kicker">
+            Trovato AI
+          </p>
 
-        <h2>
-          Explore Italy
-        </h2>
-      </section>
+          <h2>
+            Explore Italy
+          </h2>
+        </button>
+      </ion-menu-toggle>
 
       <ion-list
         class="menu-list"
@@ -24,9 +32,7 @@
           <ion-item
             button
             detail="false"
-            (click)="
-              navigateTo('/chat')
-            "
+            (click)="navigateTo('/chat')"
           >
             <ion-label>
               Chat / Search
@@ -35,36 +41,32 @@
         </ion-menu-toggle>
 
         <ion-menu-toggle
-  autoHide="true"
->
-  <ion-item
-    button
-    detail="false"
-    (click)="
-      navigateTo('/alerts')
-    "
-  >
-    <ion-label>
-      My Alerts
-    </ion-label>
-  </ion-item>
-</ion-menu-toggle>
+          autoHide="true"
+        >
+          <ion-item
+            button
+            detail="false"
+            (click)="navigateTo('/alerts')"
+          >
+            <ion-label>
+              My Alerts
+            </ion-label>
+          </ion-item>
+        </ion-menu-toggle>
 
-       <ion-menu-toggle
-  autoHide="true"
->
-  <ion-item
-    button
-    detail="false"
-    (click)="
-      navigateTo('/account')
-    "
-  >
-    <ion-label>
-      Account
-    </ion-label>
-  </ion-item>
-</ion-menu-toggle>
+        <ion-menu-toggle
+          autoHide="true"
+        >
+          <ion-item
+            button
+            detail="false"
+            (click)="navigateTo('/account')"
+          >
+            <ion-label>
+              Account
+            </ion-label>
+          </ion-item>
+        </ion-menu-toggle>
       </ion-list>
     </ion-content>
   </ion-menu>

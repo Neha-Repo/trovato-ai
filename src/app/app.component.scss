@@ -18,12 +18,23 @@ ion-menu ion-content {
 }
 
 .menu-header {
+  width: 100%;
+
   padding:
     32px
     20px
     18px;
-}
 
+  border: 0;
+  background: transparent;
+
+  color: inherit;
+  font: inherit;
+
+  text-align: left;
+
+  cursor: pointer;
+}
 .menu-kicker {
   margin:
     0

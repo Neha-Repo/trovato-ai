@@ -16,6 +16,9 @@ import {
 } from '@ionic/angular/standalone';
 
 import {
+  ChatResetService,
+} from './core/services/chat-reset.service';
+import {
   PushNotificationService,
 } from './core/services/push-notification.service';
 
@@ -43,16 +46,19 @@ export class AppComponent {
     private readonly router:
       Router,
 
+    private readonly chatResetService:
+      ChatResetService,
+
     private readonly pushNotificationService:
       PushNotificationService,
   ) {
-   void this
-  .pushNotificationService
-  .initializeNotificationActions();
+    void this
+      .pushNotificationService
+      .initializeNotificationActions();
 
-void this
-  .pushNotificationService
-  .initializeAndroidChannel();
+    void this
+      .pushNotificationService
+      .initializeAndroidChannel();
   }
 
   navigateTo(
@@ -60,6 +66,14 @@ void this
   ): void {
     void this.router.navigate([
       route,
+    ]);
+  }
+
+  startFreshChat(): void {
+    this.chatResetService.reset();
+
+    void this.router.navigate([
+      '/chat',
     ]);
   }
 }

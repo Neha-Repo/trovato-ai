@@ -2,7 +2,6 @@ import { Test } from '@nestjs/testing';
 
 import {
   AvailabilityCheckResult,
-  AvailabilityProvider,
   AvailabilityRequest,
 } from './availability-provider';
 import { AvailabilityProviderService } from './availability-provider.service';
@@ -27,6 +26,7 @@ describe('AvailabilityService', () => {
     providerService = {
       getProvider: jest
         .fn()
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         .mockReturnValue(provider as unknown as AvailabilityProvider),
     };
 

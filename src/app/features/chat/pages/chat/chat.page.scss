@@ -24,10 +24,18 @@
   min-height: 100%;
   max-width: 480px;
   margin: 0 auto;
-  padding:
-    max(env(safe-area-inset-top), var(--trovato-space-lg))
-    var(--trovato-space-lg)
-    max(env(safe-area-inset-bottom), var(--trovato-space-lg));
+ padding:
+  calc(
+    max(
+      env(safe-area-inset-top),
+      var(--trovato-space-lg)
+    ) + 56px
+  )
+  var(--trovato-space-lg)
+  max(
+    env(safe-area-inset-bottom),
+    6px
+  );
 
   display: flex;
   flex-direction: column;
@@ -77,67 +85,58 @@ h1 {
   font-size: var(--trovato-font-size-body);
   line-height: var(--trovato-line-height-relaxed);
 }
-
-/* ---------------- Suggestion cards ---------------- */
-
-.suggestions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--trovato-space-md);
-}
-
-.suggestions button {
+.chat-hero-image {
   width: 100%;
-  min-height: 112px;
-  margin: 0;
-  padding: var(--trovato-space-lg);
+  height: 320px;
 
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
 
-  appearance: none;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--trovato-radius-lg);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--trovato-color-text-primary);
+  overflow: hidden;
 
-  font-family: var(--trovato-font-family);
-  text-align: left;
-  cursor: pointer;
-  backdrop-filter: blur(12px);
+  border-radius: 24px;
 
-  transition:
-    transform 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  background: #071a33;
+
+  border: 1px solid
+    rgba(255, 255, 255, 0.06);
+
+  box-shadow:
+    0 20px 44px
+    rgba(0, 0, 0, 0.22);
 }
 
-.suggestion-icon {
-  font-size: 1.75rem;
-  line-height: 1;
+.chat-hero-image img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: contain;
+  object-position: center;
+
+  -webkit-mask-image:
+    linear-gradient(
+      to right,
+      transparent 0%,
+      black 8%,
+      black 92%,
+      transparent 100%
+    );
+
+  mask-image:
+    linear-gradient(
+      to right,
+      transparent 0%,
+      black 8%,
+      black 92%,
+      transparent 100%
+    );
 }
 
-.suggestion-label {
-  font-size: 1rem;
-  font-weight: var(--trovato-font-weight-semibold);
-  line-height: 1.3;
-}
 
-.suggestions button:hover,
-.suggestions button:focus-visible {
-  transform: translateY(-2px);
-  background: rgba(79, 124, 255, 0.14);
-  border-color: rgba(143, 180, 255, 0.5);
-  box-shadow: 0 12px 28px rgba(79, 124, 255, 0.16);
-  outline: none;
-}
 
-.suggestions button:active {
-  transform: scale(0.98);
-}
 
 /* ---------------- Conversation ---------------- */
 
@@ -177,16 +176,12 @@ h1 {
 }
 
 /* ---------------- Composer ---------------- */
-
 .chat-composer {
   margin-top: auto;
 
   padding: 12px;
-
-  background: rgba(15,27,50,.9);
-
-  border: 1px solid rgba(255,255,255,.08);
-
+  background: rgba(15, 27, 50, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
 }
 

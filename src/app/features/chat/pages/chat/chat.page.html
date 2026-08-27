@@ -2,9 +2,10 @@
   [fullscreen]="true"
   class="chat-page"
 >
-<div class="page-menu-trigger">
-  <app-menu-button />
-</div>
+  <div class="page-menu-trigger">
+    <app-menu-button />
+  </div>
+
   <main
     class="chat-container"
     [attr.aria-busy]="isSending"
@@ -27,94 +28,15 @@
         </p>
       </header>
 
-      <section
-        class="suggestions"
-        aria-label="Suggested searches"
+      <div
+        class="chat-hero-image"
+        aria-hidden="true"
       >
-        <button
-          type="button"
-          [disabled]="isSending"
-          (click)="
-            selectSuggestion(
-              'I would like to explore museums in Italy'
-            )
-          "
-        >
-          <span
-            class="suggestion-icon"
-            aria-hidden="true"
-          >
-            🏛️
-          </span>
-
-          <span class="suggestion-label">
-            Museums
-          </span>
-        </button>
-
-        <button
-          type="button"
-          [disabled]="isSending"
-          (click)="
-            selectSuggestion(
-              'Show me art museums in Florence'
-            )
-          "
-        >
-          <span
-            class="suggestion-icon"
-            aria-hidden="true"
-          >
-            🎨
-          </span>
-
-          <span class="suggestion-label">
-            Art
-          </span>
-        </button>
-
-        <button
-          type="button"
-          [disabled]="isSending"
-          (click)="
-            selectSuggestion(
-              'Find wine tours in Tuscany'
-            )
-          "
-        >
-          <span
-            class="suggestion-icon"
-            aria-hidden="true"
-          >
-            🍷
-          </span>
-
-          <span class="suggestion-label">
-            Wine tours
-          </span>
-        </button>
-
-        <button
-          type="button"
-          [disabled]="isSending"
-          (click)="
-            selectSuggestion(
-              'Find football matches in Italy'
-            )
-          "
-        >
-          <span
-            class="suggestion-icon"
-            aria-hidden="true"
-          >
-            ⚽
-          </span>
-
-          <span class="suggestion-label">
-            Football
-          </span>
-        </button>
-      </section>
+        <img
+          src="assets/images/explore-italy.png"
+          alt=""
+        />
+      </div>
     } @else {
       <section
         class="conversation"
@@ -130,8 +52,7 @@
               message.sender === 'user'
             "
             [class.message--assistant]="
-              message.sender ===
-              'assistant'
+              message.sender === 'assistant'
             "
           >
             <p>
