@@ -66,6 +66,8 @@ yarn-error.log
 /libpeerconnection.log
 testem.log
 /typings
+*.jks
+android/key.properties
 
 # System files
 .DS_Store

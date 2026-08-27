@@ -9,6 +9,10 @@ import {
   firstValueFrom,
 } from 'rxjs';
 
+import {
+  environment,
+} from '../../../../environments/environment';
+
 export interface BackendAvailabilityRequest {
   experienceId: string;
   requestedDate: string;
@@ -54,8 +58,8 @@ export class AvailabilityApiService {
   private readonly http =
     inject(HttpClient);
 
-  private readonly apiUrl =
-    'http://localhost:3000/availability/check';
+ private readonly apiUrl =
+  `${environment.apiBaseUrl}/availability/check`;
 
   async checkAvailability(
     request: BackendAvailabilityRequest,

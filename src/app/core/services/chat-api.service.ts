@@ -13,6 +13,10 @@ import {
   ChatMessage,
 } from '../../features/chat/models/chat-message.model';
 
+import {
+  environment,
+} from '../../../environments/environment';
+
 export interface SearchRequest {
   experience: string;
   city: string;
@@ -43,7 +47,7 @@ export class ChatApiService {
     inject(HttpClient);
 
   private readonly apiUrl =
-    'http://localhost:3000/chat';
+  `${environment.apiBaseUrl}/chat`;
 
   sendMessages(
     messages: ChatMessage[],
