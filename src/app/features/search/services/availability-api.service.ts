@@ -22,7 +22,7 @@ export interface BackendAvailabilityRequest {
 export interface BackendAvailabilitySlot {
   id: string;
   time: string;
-  availableTickets: number;
+  availableTickets?: number;
   pricePerPerson: number;
   bookingUrl: string;
 }
@@ -45,7 +45,7 @@ export interface BackendAvailabilityResponse {
   alternateDates:
     BackendAvailableDate[];
 
-  largestAvailableGroupSize:
+  largestAvailableGroupSize?:
     number;
 
   available: boolean;
@@ -58,8 +58,8 @@ export class AvailabilityApiService {
   private readonly http =
     inject(HttpClient);
 
- private readonly apiUrl =
-  `${environment.apiBaseUrl}/availability/check`;
+  private readonly apiUrl =
+    `${environment.apiBaseUrl}/availability/check`;
 
   async checkAvailability(
     request: BackendAvailabilityRequest,

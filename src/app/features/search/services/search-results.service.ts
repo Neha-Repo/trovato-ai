@@ -30,7 +30,8 @@ interface ExperienceEvaluation {
 
   alternateDates: AvailableDate[];
 
-  largestAvailableGroupSize: number;
+ largestAvailableGroupSize?:
+  number;
 
   state: Exclude<
     SearchResultState,
@@ -553,7 +554,7 @@ const response =
       alternateDates:
         AvailableDate[];
 
-      largestAvailableGroupSize:
+      largestAvailableGroupSize?:
         number;
 
       requestedTicketCount:
@@ -586,13 +587,15 @@ const response =
     }
 
     if (
-      largestAvailableGroupSize >
-        0 &&
-      largestAvailableGroupSize <
-        requestedTicketCount
-    ) {
-      return 'group-too-large';
-    }
+  largestAvailableGroupSize !==
+    undefined &&
+  largestAvailableGroupSize >
+    0 &&
+  largestAvailableGroupSize <
+    requestedTicketCount
+) {
+  return 'group-too-large';
+}
 
     return 'no-availability';
   }

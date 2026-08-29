@@ -13,7 +13,7 @@ export type SuggestedExperienceState =
 export interface AvailabilitySlot {
   id: string;
   time: string;
-  availableTickets: number;
+  availableTickets?: number;
   pricePerPerson: number;
   bookingUrl: string;
 }

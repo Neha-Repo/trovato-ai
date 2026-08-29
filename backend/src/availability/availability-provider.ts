@@ -7,7 +7,7 @@ export interface AvailabilityRequest {
 export interface AvailabilitySlot {
   id: string;
   time: string;
-  availableTickets: number;
+  availableTickets?: number;
   pricePerPerson: number;
   bookingUrl: string;
 }
@@ -28,7 +28,7 @@ export interface AvailabilityCheckResult {
 
   alternateDates: AvailableDate[];
 
-  largestAvailableGroupSize: number;
+  largestAvailableGroupSize?: number;
 
   available: boolean;
 }
