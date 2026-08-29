@@ -14,6 +14,10 @@ interface MockSlotTemplate {
   pricePerPerson: number;
 }
 
+interface MockAvailabilitySlot extends AvailabilitySlot {
+  availableTickets: number;
+}
+
 interface MockDayTemplate {
   daysFromRequestedDate: number;
   slots: MockSlotTemplate[];
@@ -92,10 +96,10 @@ export class MockAvailabilityProvider implements AvailabilityProvider {
   private createInventory(
     experienceId: string,
     requestedDate: Date,
-  ): Record<string, AvailabilitySlot[]> {
+  ): Record<string, MockAvailabilitySlot[]> {
     const template = this.getTemplate(experienceId);
 
-    const inventory: Record<string, AvailabilitySlot[]> = {};
+    const inventory: Record<string, MockAvailabilitySlot[]> = {};
 
     for (const day of template) {
       const date = new Date(requestedDate);
@@ -395,7 +399,7 @@ export class MockAvailabilityProvider implements AvailabilityProvider {
   }
 
   private createAlternateDates(
-    inventory: Record<string, AvailabilitySlot[]>,
+    inventory: Record<string, MockAvailabilitySlot[]>,
 
     requestedDateKey: string,
 
@@ -413,14 +417,14 @@ export class MockAvailabilityProvider implements AvailabilityProvider {
   }
 
   private filterBookableSlots(
-    slots: AvailabilitySlot[],
+    slots: MockAvailabilitySlot[],
 
     travellers: number,
-  ): AvailabilitySlot[] {
+  ): MockAvailabilitySlot[] {
     return slots.filter((slot) => slot.availableTickets >= travellers);
   }
 
-  private getLargestAvailableGroupSize(slots: AvailabilitySlot[]): number {
+  private getLargestAvailableGroupSize(slots: MockAvailabilitySlot[]): number {
     if (slots.length === 0) {
       return 0;
     }

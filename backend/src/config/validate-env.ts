@@ -2,6 +2,8 @@ interface EnvironmentVariables {
   SUPABASE_URL?: string;
   SUPABASE_SECRET_KEY?: string;
   FIREBASE_SERVICE_ACCOUNT_PATH?: string;
+  VIATOR_API_KEY?: string;
+  VIATOR_API_BASE_URL?: string;
   PORT?: string;
   CORS_ORIGINS?: string;
 }
@@ -15,6 +17,8 @@ export function validateEnvironment(
     'SUPABASE_URL',
     'SUPABASE_SECRET_KEY',
     'FIREBASE_SERVICE_ACCOUNT_PATH',
+    'VIATOR_API_KEY',
+    'VIATOR_API_BASE_URL',
     'CORS_ORIGINS',
   ] as const;
 

@@ -229,15 +229,21 @@
                     {{ slot.time }}
                   </h3>
 
-                  <p>
-                    {{ slot.availableTickets }}
-                    tickets available
-                  </p>
+                  @if (slot.availableTickets !== undefined) {
+                    <p>
+                      {{ slot.availableTickets }}
+                      tickets available
+                    </p>
+                  } @else {
+                    <p>Availability shown by provider</p>
+                  }
 
-                  <p class="slot-price">
-                    €{{ slot.pricePerPerson }}
-                    per person
-                  </p>
+                  @if (slot.pricePerPerson !== undefined) {
+                    <p class="slot-price">
+                      €{{ slot.pricePerPerson }}
+                      per person
+                    </p>
+                  }
                 </div>
 
                 <div class="booking-action">
@@ -386,15 +392,21 @@
                       {{ slot.time }}
                     </h3>
 
-                    <p>
-                      {{ slot.availableTickets }}
-                      tickets available
-                    </p>
+                    @if (slot.availableTickets !== undefined) {
+                      <p>
+                        {{ slot.availableTickets }}
+                        tickets available
+                      </p>
+                    } @else {
+                      <p>Availability shown by provider</p>
+                    }
 
-                    <p class="slot-price">
-                      €{{ slot.pricePerPerson }}
-                      per person
-                    </p>
+                    @if (slot.pricePerPerson !== undefined) {
+                      <p class="slot-price">
+                        €{{ slot.pricePerPerson }}
+                        per person
+                      </p>
+                    }
                   </div>
 
                   <div class="booking-action">
@@ -577,15 +589,21 @@
                                 {{ slot.time }}
                               </strong>
 
-                              <span>
-                                €{{ slot.pricePerPerson }}
-                                per person
-                              </span>
+                              @if (slot.pricePerPerson !== undefined) {
+                                <span>
+                                  €{{ slot.pricePerPerson }}
+                                  per person
+                                </span>
+                              }
 
-                              <small>
-                                {{ slot.availableTickets }}
-                                tickets available
-                              </small>
+                              @if (slot.availableTickets !== undefined) {
+                                <small>
+                                  {{ slot.availableTickets }}
+                                  tickets available
+                                </small>
+                              } @else {
+                                <small>Availability shown by provider</small>
+                              }
                             </div>
 
                             <div
@@ -833,15 +851,21 @@
                                 {{ slot.time }}
                               </strong>
 
-                              <span>
-                                €{{ slot.pricePerPerson }}
-                                per person
-                              </span>
+                              @if (slot.pricePerPerson !== undefined) {
+                                <span>
+                                  €{{ slot.pricePerPerson }}
+                                  per person
+                                </span>
+                              }
 
-                              <small>
-                                {{ slot.availableTickets }}
-                                tickets available
-                              </small>
+                              @if (slot.availableTickets !== undefined) {
+                                <small>
+                                  {{ slot.availableTickets }}
+                                  tickets available
+                                </small>
+                              } @else {
+                                <small>Availability shown by provider</small>
+                              }
                             </div>
 
                             <div

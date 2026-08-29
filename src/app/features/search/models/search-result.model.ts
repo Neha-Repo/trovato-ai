@@ -14,7 +14,7 @@ export interface AvailabilitySlot {
   id: string;
   time: string;
   availableTickets?: number;
-  pricePerPerson: number;
+  pricePerPerson?: number;
   bookingUrl: string;
 }
 
