@@ -144,9 +144,9 @@ describe('AvailabilityWatchCheckerService', () => {
     expect(getTokensForUser).toHaveBeenCalledWith(watch.userId);
 
     expect(sendAvailabilityNotification).toHaveBeenCalledWith('token-1', {
-      title: 'Tickets available',
+      title: 'Availability found',
 
-      body: 'Vatican Museums now has availability for 2 travellers on 24 August 2026.',
+      body: 'Vatican Museums now shows availability on 24 August 2026. Check the booking provider for current capacity.',
 
       data: {
         type: 'availability-match',

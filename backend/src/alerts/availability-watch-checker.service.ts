@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { FirebaseMessagingError } from 'firebase-admin/messaging';
 
 import { AvailabilityService } from '../availability/availability.service';
 import { FirebasePushService } from '../push/firebase-push.service';
@@ -7,8 +9,6 @@ import {
   AvailabilityWatch,
   AvailabilityWatchService,
 } from './availability-watch.service';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { FirebaseMessagingError } from 'firebase-admin/messaging';
 
 @Injectable()
 export class AvailabilityWatchCheckerService {
@@ -62,11 +62,9 @@ export class AvailabilityWatchCheckerService {
       for (const token of tokens) {
         try {
           await this.firebasePushService.sendAvailabilityNotification(token, {
-            title: 'Tickets available',
+            title: 'Availability found',
 
-            body: `${watch.experienceTitle} now has availability for ${watch.travellers} ${
-              watch.travellers === 1 ? 'traveller' : 'travellers'
-            } on ${watch.requestedDate}.`,
+            body: `${watch.experienceTitle} now shows availability on ${watch.requestedDate}. Check the booking provider for current capacity.`,
 
             data: {
               type: 'availability-match',
@@ -111,6 +109,7 @@ export class AvailabilityWatchCheckerService {
       });
     }
   }
+
   @Cron(CronExpression.EVERY_5_MINUTES)
   async runScheduledCheck(): Promise<void> {
     await this.checkActiveWatches();
