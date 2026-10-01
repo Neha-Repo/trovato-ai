@@ -19,6 +19,14 @@ The core application is substantially complete and is currently being prepared f
 <img width="350" height="604" alt="image" src="https://github.com/user-attachments/assets/176c6428-7c7f-4be8-bf75-f601e74d4e30" />
 <img width="353" height="588" alt="image" src="https://github.com/user-attachments/assets/5f7ffd28-835f-490c-a4e2-df948fda4b45" />
 <img width="339" height="581" alt="image" src="https://github.com/user-attachments/assets/959b5bca-750b-41f8-9263-8d12313e3947" />
+<img width="336" height="586" alt="image" src="https://github.com/user-attachments/assets/695b0b67-40b4-4a2c-9280-c3a8d4650916" />
+<img width="348" height="588" alt="image" src="https://github.com/user-attachments/assets/743fe3f8-da80-4767-bc67-62c9145d3050" />
+<img width="531" height="378" alt="image" src="https://github.com/user-attachments/assets/64fc25b9-c3b9-48d4-bb25-bf0b01a000a9" />
+<img width="492" height="316" alt="image" src="https://github.com/user-attachments/assets/8f859912-c623-41ab-b4d2-54b7e8878152" />
+
+
+
+
 
 
 
